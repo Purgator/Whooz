@@ -34,6 +34,15 @@ class UpdateBanner(private val activity: Activity, container: FrameLayout) {
     /** Set when Install bounced to the unknown-sources screen; [retryIfPending] consumes it. */
     private var pendingInstall = false
 
+    /**
+     * Set by [startInstall] until the host pauses ([onHostPaused]): an installer session is
+     * being written or committed, so a re-offer of the same APK (the host's resume threads
+     * race with [retryIfPending]) must not bring Install back and let a second session be
+     * opened on top of the first. A successful install restarts the process; a failed one
+     * surfaces through a system screen or toast, after which the next resume offers again.
+     */
+    private var installing = false
+
     init {
         view.visibility = View.GONE
         view.findViewById<View>(R.id.update_install).setOnClickListener { install() }
@@ -41,8 +50,12 @@ class UpdateBanner(private val activity: Activity, container: FrameLayout) {
         container.addView(view)
     }
 
-    /** Shows [update] unless the user tapped Later on this version less than a day ago. */
+    /**
+     * Shows [update] unless the user tapped Later on this version less than a day ago, or
+     * an install started from this strip is still in flight.
+     */
     fun offer(update: UpdateManager.ReadyUpdate) {
+        if (installing) return
         val dismissed = UpdatePolicy.isDismissed(
             update.version, settings.updateDismissedVersion, settings.updateDismissedAt, System.currentTimeMillis(),
         )
@@ -72,14 +85,26 @@ class UpdateBanner(private val activity: Activity, container: FrameLayout) {
     }
 
     /**
-     * Called by the host's `onResume`: if Install had to send the user to the
-     * unknown-sources setting, continue the install now that the permission may be granted.
-     * If it was refused, the banner simply stays, ready for another tap.
+     * Called by the host's `onResume`, before it re-offers anything: if Install had to send
+     * the user to the unknown-sources setting, continue the install now that the permission
+     * may be granted. If it was refused, the banner simply stays, ready for another tap.
+     * Returns true when an install was started, so the host can skip its re-offer.
      */
-    fun retryIfPending() {
-        if (!pendingInstall) return
+    fun retryIfPending(): Boolean {
+        if (!pendingInstall) return false
         pendingInstall = false
-        if (offer != null && activity.packageManager.canRequestPackageInstalls()) startInstall()
+        if (offer == null || !activity.packageManager.canRequestPackageInstalls()) return false
+        startInstall()
+        return true
+    }
+
+    /**
+     * Called by the host's `onPause`. Leaving the screen is the only signal this strip gets
+     * that an install attempt is over (the installer's own dialog, the ACTION_VIEW fallback
+     * or the user walking away): the next resume may offer again.
+     */
+    fun onHostPaused() {
+        installing = false
     }
 
     private fun apply() {
@@ -109,6 +134,7 @@ class UpdateBanner(private val activity: Activity, container: FrameLayout) {
     private fun startInstall() {
         val update = offer ?: return
         val app = activity.applicationContext
+        installing = true
         hide()
         val thread = Thread({ ApkInstaller.install(app, update.file) }, "whooz-install")
         thread.isDaemon = true

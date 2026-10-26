@@ -47,11 +47,19 @@ class MainActivity : AppCompatActivity(), FingerChooserView.Listener {
     private lateinit var insetsController: WindowInsetsControllerCompat
 
     private val handler = Handler(Looper.getMainLooper())
-    private val keepScreenOffRunnable = Runnable { window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    private val keepScreenOffRunnable = Runnable { releaseKeepScreenOn() }
     private val captionFadeRunnable = Runnable { fadeCaption() }
 
     private var hasCamera = false
     private var keepScreenOn = true
+
+    /**
+     * Mirror of FLAG_KEEP_SCREEN_ON on our window. `Window.addFlags` never compares with the
+     * current flags: every call forces a WindowManager relayout and a full traversal, which
+     * would land in the very frame that must draw the first finger's circle, so the flag is
+     * touched only when this mirror says it changes.
+     */
+    private var keepScreenOnHeld = false
     private var mode: Mode = Mode.DEFAULT
     private var roundsCompleted = 0
 
@@ -74,7 +82,20 @@ class MainActivity : AppCompatActivity(), FingerChooserView.Listener {
             settings.lastMode == Settings.ScreenMode.CAMERA
         ) {
             redirected = true
-            startActivity(Intent(this, CameraActivity::class.java))
+            // This activity is singleTask and finishes right away, so the task's root record
+            // is gone while CameraActivity lives on. A later launcher tap finds the task but
+            // no MainActivity to deliver to and creates a fresh one ON TOP of that camera
+            // screen; without these flags its redirect would stack a second CameraActivity
+            // (and a third on the next tap). CLEAR_TOP | SINGLE_TOP instead collapses the
+            // task onto the existing CameraActivity, which gets onNewIntent and resumes.
+            startActivity(
+                Intent(this, CameraActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            )
+            // Camera-only groups never show this screen, so the daily update check would
+            // never run for them: kick it off here too (download only; the banner shows the
+            // next time the finger screen is on screen).
+            startDailyCheck(offer = false)
             finish()
             return
         }
@@ -150,8 +171,9 @@ class MainActivity : AppCompatActivity(), FingerChooserView.Listener {
     override fun onPause() {
         if (!redirected) {
             arena.resetAll()
+            banner.onHostPaused()
             handler.removeCallbacks(keepScreenOffRunnable)
-            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            releaseKeepScreenOn()
         }
         super.onPause()
     }
@@ -179,9 +201,19 @@ class MainActivity : AppCompatActivity(), FingerChooserView.Listener {
      */
     private fun armKeepScreenOn() {
         if (!keepScreenOn) return
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        if (!keepScreenOnHeld) {
+            keepScreenOnHeld = true
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        // Rescheduling is a cheap message-queue swap; the flag itself stays as it is.
         handler.removeCallbacks(keepScreenOffRunnable)
         handler.postDelayed(keepScreenOffRunnable, KEEP_SCREEN_ON_MS)
+    }
+
+    private fun releaseKeepScreenOn() {
+        if (!keepScreenOnHeld) return
+        keepScreenOnHeld = false
+        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     // ---- Chrome ---------------------------------------------------------------------------
@@ -287,23 +319,34 @@ class MainActivity : AppCompatActivity(), FingerChooserView.Listener {
      * The daily GitHub check runs once per process after the first frame; every resume also
      * re-offers an APK that is already downloaded (the banner may have been dismissed by a
      * round) and resumes an install that bounced to the unknown-sources screen.
+     *
+     * The retry goes first: when it starts the install, the strip must stay down, so the
+     * re-offer thread is not started at all (the banner also ignores offers while installing,
+     * which covers the daily thread started on an earlier resume).
      */
     private fun startUpdateChecks() {
         val app = applicationContext
-        if (!dailyCheckStarted) {
-            dailyCheckStarted = true
-            arena.post {
-                runDaemon("whooz-update-check") {
-                    val ready = UpdateManager.maybeDailyCheck(app)
-                    if (ready != null) offerOnUiThread(ready)
-                }
-            }
-        }
+        if (!dailyCheckStarted) arena.post { startDailyCheck(offer = true) }
+        if (banner.retryIfPending()) return
         runDaemon("whooz-update-ready") {
             val ready = UpdateManager.readyUpdate(app)
             if (ready != null) offerOnUiThread(ready)
         }
-        banner.retryIfPending()
+    }
+
+    /**
+     * Once per process: the network check (and the stale-session cleanup it carries). With
+     * [offer] the result goes to the banner; the redirect path has no banner and just lets
+     * the download land in the cache.
+     */
+    private fun startDailyCheck(offer: Boolean) {
+        if (dailyCheckStarted) return
+        dailyCheckStarted = true
+        val app = applicationContext
+        runDaemon("whooz-update-check") {
+            val ready = UpdateManager.maybeDailyCheck(app)
+            if (offer && ready != null) offerOnUiThread(ready)
+        }
     }
 
     private fun offerOnUiThread(ready: UpdateManager.ReadyUpdate) {

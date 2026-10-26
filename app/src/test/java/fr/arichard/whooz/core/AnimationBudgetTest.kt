@@ -44,6 +44,34 @@ class AnimationBudgetTest {
     }
 
     @Test
+    fun revealRoundsNeedNoFramesOnceInResult() {
+        // Order and Teams have no flood: every reveal transient ends at the RESULT boundary.
+        for (mode in arrayOf<Mode>(Mode.Order, Mode.Teams(2))) {
+            val e = ChooserEngine(timings, Random(1), abortOnLift = true)
+            e.start(intArrayOf(0, 1, 2), 3, mode, 0L)
+            assertTrue(e.revealing)
+            e.tick(1_000L)
+            assertEquals(Phase.ELIMINATING, e.phase)
+            assertTrue(e.needsFrames(1_000L))
+            val resultAt = e.eliminationStartMs() + revealMs(mode, 3)
+            e.tick(resultAt - 1)
+            assertEquals(Phase.ELIMINATING, e.phase)
+            e.tick(resultAt)
+            assertEquals(Phase.RESULT, e.phase)
+            assertFalse(e.needsFrames(resultAt))
+            assertFalse(e.needsFrames(resultAt + timings.floodMs - 1))
+
+            assertTrue(e.requestRearm(true, resultAt + timings.resultHoldMs))
+            assertTrue(e.needsFrames(resultAt + timings.resultHoldMs))
+        }
+    }
+
+    private fun revealMs(mode: Mode, n: Int): Long = when (mode) {
+        Mode.Order -> ChooserEngine.REVEAL_ORDER_STEP_MS * n
+        else -> ChooserEngine.REVEAL_TEAM_FADE_MS + ChooserEngine.REVEAL_TEAM_STAGGER_MS * n
+    }
+
+    @Test
     fun abortedRoundStopsFramesImmediately() {
         val e = ChooserEngine(timings, Random(1), abortOnLift = true)
         e.start(intArrayOf(0, 1), 2, Mode.Winner(1), 0L)

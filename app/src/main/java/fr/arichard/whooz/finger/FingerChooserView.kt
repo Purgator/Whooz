@@ -81,7 +81,13 @@ class FingerChooserView @JvmOverloads constructor(
 
     // ---- Per-slot state (slot = color index, 0 until Palette.SIZE) -----------------------
 
-    /** Last known position of the finger owning each slot; survives a lift so a frozen participant keeps its ring. */
+    /**
+     * Last known position of the finger owning each slot; survives a lift so a frozen
+     * participant keeps its ring. During FADING the entries of the round's participants are
+     * pinned (see [keepsResultGeometry]): every slot is free again by then, so a finger
+     * landing mid-fade reuses a winner's slot and must not drag the fading flood and winner
+     * ring onto itself.
+     */
     private val slotX = FloatArray(Palette.SIZE)
     private val slotY = FloatArray(Palette.SIZE)
 
@@ -283,8 +289,10 @@ class FingerChooserView @JvmOverloads constructor(
             val slot = tracker.slotAt(tracker.indexOfId(id))
             appearMs[slot] = now
             lastAppearMs = now
-            slotX[slot] = x
-            slotY[slot] = y
+            if (!keepsResultGeometry(phase, slot)) {
+                slotX[slot] = x
+                slotY[slot] = y
+            }
             haptics?.tick(this)
         }
         touchChanged(now)
@@ -548,15 +556,17 @@ class FingerChooserView @JvmOverloads constructor(
         val flooding = (phase == Phase.RESULT || phase == Phase.FADING) && !engine.revealing
 
         for (slot in 0 until Palette.SIZE) {
-            val present = slotIndex[slot] >= 0
+            val i = slotIndex[slot]
+            val present = i >= 0
             if (phase == Phase.IDLE) {
-                if (present) drawGatheringFinger(canvas, slot, now)
+                if (present) drawGatheringFinger(canvas, slot, tracker.xAt(i), tracker.yAt(i), now)
             } else if (engine.isParticipant(slot) && !(phase == Phase.FADING && present)) {
                 // Winners are drawn after the flood so their ring sits on top of it.
                 if (!(flooding && engine.isWinner(slot))) drawRoundFinger(canvas, slot, now, phase, fade)
             } else if (present && phase == Phase.FADING) {
-                // A fresh finger landing while the result fades is a normal gathering finger.
-                drawGatheringFinger(canvas, slot, now)
+                // A fresh finger landing while the result fades is a normal gathering finger,
+                // drawn where it is: slotX/slotY may still hold the fading result's geometry.
+                drawGatheringFinger(canvas, slot, tracker.xAt(i), tracker.yAt(i), now)
             }
         }
 
@@ -574,15 +584,26 @@ class FingerChooserView @JvmOverloads constructor(
 
     /** One pass over the tracker: which slot is a live participant, and where. */
     private fun refreshSlots() {
+        val phase = engine.phase
         for (s in 0 until Palette.SIZE) slotIndex[s] = -1
         for (i in 0 until tracker.count) {
             if (tracker.isAbsorbed(i)) continue
             val slot = tracker.slotAt(i)
             slotIndex[slot] = i
+            if (keepsResultGeometry(phase, slot)) continue
             slotX[slot] = tracker.xAt(i)
             slotY[slot] = tracker.yAt(i)
         }
     }
+
+    /**
+     * True while [slot]'s entry in [slotX]/[slotY] belongs to the fading result rather than
+     * to the finger currently on it. FADING starts only once every finger lifted, so from
+     * then on any non-absorbed tracker entry is a newcomer; in RESULT the opposite holds
+     * (newcomers are absorbed) and a winner still holding its finger keeps its ring moving.
+     */
+    private fun keepsResultGeometry(phase: Phase, slot: Int): Boolean =
+        phase == Phase.FADING && engine.isParticipant(slot)
 
     /** Faint grid while gathering; it dissolves as the countdown starts and returns with the fade. */
     private fun drawGrid(canvas: Canvas, now: Long, phase: Phase) {
@@ -599,8 +620,11 @@ class FingerChooserView @JvmOverloads constructor(
         if (gridMajorCount > 0) canvas.drawLines(gridMajor, 0, gridMajorCount, gridMajorPaint)
     }
 
-    /** A finger while the engine is IDLE: appear pop, arming arc, abort collapse. */
-    private fun drawGatheringFinger(canvas: Canvas, slot: Int, now: Long) {
+    /**
+     * A finger while the engine is IDLE (or landing during the fade): appear pop, arming
+     * arc, abort collapse. Drawn at the tracker's [x]/[y], never from [slotX]/[slotY].
+     */
+    private fun drawGatheringFinger(canvas: Canvas, slot: Int, x: Float, y: Float, now: Long) {
         var scale = 1f
         var stroke = ringStroke
         val appear = now - appearMs[slot]
@@ -615,7 +639,7 @@ class FingerChooserView @JvmOverloads constructor(
             stroke = Easing.lerp(ringStrokeThick, ringStroke, c)
             scale *= Easing.lerp(ABORT_SCALE, 1f, c)
         }
-        drawCircleSet(canvas, slotX[slot], slotY[slot], Palette.of(slot), 1f, scale, stroke, arc, DISC_ALPHA)
+        drawCircleSet(canvas, x, y, Palette.of(slot), 1f, scale, stroke, arc, DISC_ALPHA)
     }
 
     /** A frozen participant: pulse, dimming, vanishing, number or team color. */

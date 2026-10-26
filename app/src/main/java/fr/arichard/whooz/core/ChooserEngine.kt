@@ -208,11 +208,15 @@ class ChooserEngine(
     /**
      * Whether the frame loop must run: every animated phase, plus RESULT only while the
      * flood (or bands) is still growing. A steady result and IDLE cost zero frames.
+     *
+     * A reveal round (Order/Teams) has no flood: its last number pop or team fade ends at
+     * the ELIMINATING boundary by construction (see [start]), so its RESULT is steady from
+     * the first frame and asks for none.
      */
     fun needsFrames(nowMs: Long): Boolean = when (phase) {
         Phase.IDLE -> false
         Phase.COUNTDOWN, Phase.ELIMINATING, Phase.FADING -> true
-        Phase.RESULT -> nowMs - phaseStartMs < timings.floodMs
+        Phase.RESULT -> !revealing && nowMs - phaseStartMs < timings.floodMs
     }
 
     fun phaseElapsedMs(nowMs: Long): Long = nowMs - phaseStartMs
