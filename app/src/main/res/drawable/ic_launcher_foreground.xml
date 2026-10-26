@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Faint ring joining the players. -->
+    <path
+        android:pathData="M54,28 A26,26 0 1,1 53.99,28"
+        android:strokeColor="#2EFFFFFF"
+        android:strokeWidth="2.5"
+        android:fillColor="#00000000" />
+    <!-- Three eliminated players: dimmed dots. -->
+    <path android:fillColor="#5AFF4081" android:pathData="M80,54 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+    <path android:fillColor="#5AFFD740" android:pathData="M54,80 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+    <path android:fillColor="#5A69F0AE" android:pathData="M28,54 m-6,0 a6,6 0 1,0 12,0 a6,6 0 1,0 -12,0" />
+    <!-- The chosen one: bright dot with a glow ring. -->
+    <path
+        android:pathData="M54,28 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0"
+        android:strokeColor="#6600E5FF"
+        android:strokeWidth="3"
+        android:fillColor="#00000000" />
+    <path android:fillColor="#00E5FF" android:pathData="M54,28 m-7,0 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0" />
+</vector>

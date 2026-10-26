@@ -1,0 +1,19 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Settings and dialogs: forced dark, deep-space surface. -->
+    <style name="Theme.Whooz" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorSecondary">@color/accent</item>
+        <item name="android:colorBackground">@color/deep_space</item>
+        <item name="colorSurface">@color/deep_space</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+    </style>
+
+    <!-- The arena: edge to edge, nothing but the dark surface and the players. -->
+    <style name="Theme.Whooz.Arena">
+        <item name="android:windowBackground">@color/deep_space</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="o_mr1">shortEdges</item>
+    </style>
+</resources>
