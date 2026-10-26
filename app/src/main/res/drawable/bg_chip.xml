@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Unselected chip: a hairline pill. Selection is driven by View.isSelected so the row
+     code only flips one flag per chip. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true" android:drawable="@drawable/bg_chip_selected" />
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="18dp" />
+            <solid android:color="@color/surface" />
+            <stroke android:width="1dp" android:color="@color/surface_stroke" />
+        </shape>
+    </item>
+</selector>

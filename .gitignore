@@ -11,3 +11,6 @@ captures/
 .DS_Store
 .claude/settings.local.json
 Whooz.apk
+
+# Claude Code session files (worktrees, local settings)
+.claude/

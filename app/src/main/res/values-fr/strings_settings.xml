@@ -1,0 +1,5 @@
+<resources>
+    <!-- Settings screen extras (the shared keys live in strings.xml). -->
+    <string name="update_check_failed">Impossible de vérifier les mises à jour</string>
+    <string name="settings_no_browser">Aucune application ne peut ouvrir ce lien</string>
+</resources>
