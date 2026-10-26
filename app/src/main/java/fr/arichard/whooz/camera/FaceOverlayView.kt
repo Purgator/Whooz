@@ -38,6 +38,19 @@ import kotlin.random.Random
  *
  * Haptics, hint, chrome and analyzer changes are emitted from [tick] and the event handlers by
  * comparing the desired state with what was last emitted, never from `onDraw`.
+ *
+ * Between `onPause` ([resetAll]) and the next `onResume` ([configure]) the view is paused: the
+ * frame that was already inside ML Kit when the analyzer stopped, or any frame of a screen that
+ * stays visible while paused (Recents, a dialog on top), is stored but neither fed to the gate
+ * nor drawn, so no round can start, buzz and die while nobody is looking. [configure] rebuilds
+ * the engine and gate and resets every piece of emitted-state bookkeeping and every pending
+ * timer with them, so a replaced engine never sits under a stale hint, a dark chrome or an
+ * analyzer nobody will re-enable.
+ *
+ * Two sleep paths release the camera: a result left untouched for `resultIdleTimeoutMs`, and
+ * an IDLE screen that saw no confirmed face, tap or round for [IDLE_SLEEP_MS] ([IdleSleep]). Both
+ * end in [enterSleep]; a tap rebinds. Nothing is drawn while nothing changed: an empty frame
+ * after an empty view does not invalidate, so an idle camera in an empty room costs no redraws.
  */
 class FaceOverlayView @JvmOverloads constructor(
     context: Context,
@@ -60,6 +73,13 @@ class FaceOverlayView @JvmOverloads constructor(
 
         /** A tap while asleep: bind the camera again. */
         fun onCameraWake()
+
+        /**
+         * Someone is using the screen: a tap, a change of the confirmed-face set or a round
+         * start. The host re-arms its keep-screen-on timer on it, as the finger arena does on
+         * every touch.
+         */
+        fun onInteraction()
     }
 
     var host: Host? = null
@@ -79,10 +99,23 @@ class FaceOverlayView @JvmOverloads constructor(
     private var haptics = Haptics(context, false)
     private val clock = FrameClock(this, this)
     private val comeCloser = ComeCloser(COME_CLOSER_MIN_DP * density, COME_CLOSER_HOLD_MS)
+    private val idleSleep = IdleSleep(IDLE_SLEEP_MS)
 
     private var frame: FaceFrame = FaceFrame()
     private var nowMs = 0L
     private var sleeping = false
+
+    /** Between [resetAll] and [configure]: frames are stored but ignored, nothing is drawn. */
+    private var paused = true
+
+    /** True while [idleRunnable] is posted; the lazy timer is never posted twice. */
+    private var idleCheckPosted = false
+
+    /** Set version of the last frame handled; a change is an interaction for the host. */
+    private var lastSetVersion = 0
+
+    /** True when the last `onDraw` drew nothing, so an empty frame need not redraw. */
+    private var drawnEmpty = false
 
     // Round snapshot, indexed by slot.
     private val roundActive = BooleanArray(Palette.SIZE)
@@ -151,6 +184,7 @@ class FaceOverlayView @JvmOverloads constructor(
     private val debugCorners = FloatArray(8)
 
     private val sleepRunnable = Runnable { enterSleep() }
+    private val idleRunnable = Runnable { checkIdle() }
     private val holdRunnable = Runnable {
         resultHoldElapsed = true
         syncDerived(SystemClock.uptimeMillis())
@@ -159,9 +193,12 @@ class FaceOverlayView @JvmOverloads constructor(
     // ---- Configuration -----------------------------------------------------------------
 
     /**
-     * Applies the settings snapshot; call from `onResume`, when the engine is IDLE (the
-     * activity resets the view in `onPause`). A new engine and gate are built because their
-     * timings are immutable; the draw loop then never reads preferences.
+     * Applies the settings snapshot; call from `onResume`. A new engine and gate are built
+     * because their timings are immutable; the draw loop then never reads preferences. The
+     * replacement goes through the same [reset] as `onPause`: whatever the old engine was doing
+     * (a round that ran while the screen was paused but visible, see the class doc) must leave
+     * no timer, hint, chrome state or analyzer request behind, otherwise the fresh IDLE engine
+     * would sit under "Tap to play again" with the analyzer off and nothing to turn it on.
      */
     fun configure(timings: Timings, haptics: Haptics, mode: Mode) {
         this.timings = timings
@@ -169,6 +206,8 @@ class FaceOverlayView @JvmOverloads constructor(
         this.mode = mode
         engine = ChooserEngine(timings, random, abortOnLift = false)
         gate = StabilityGate(timings.stableMs, timings.collapseMs)
+        paused = false
+        reset(SystemClock.uptimeMillis())
     }
 
     /** Flips the debug drawing; returns the new state so the activity can tell the source. */
@@ -183,21 +222,34 @@ class FaceOverlayView @JvmOverloads constructor(
     }
 
     /**
-     * `onPause`: no round, no loop, no pending timer, and the analyzer wanted again so the next
-     * bind starts detecting whatever phase the screen was in.
+     * `onPause`: no round, no loop, no pending timer, the analyzer wanted again so the next
+     * bind starts detecting whatever phase the screen was in, and the view paused so the frames
+     * that still trickle in change nothing until [configure].
      */
     fun resetAll() {
-        val now = SystemClock.uptimeMillis()
+        paused = true
+        reset(SystemClock.uptimeMillis())
+    }
+
+    /** The common ground of [configure] and [resetAll]: back to a clean IDLE, bookkeeping included. */
+    private fun reset(now: Long) {
         nowMs = now
         removeCallbacks(sleepRunnable)
         removeCallbacks(holdRunnable)
+        removeCallbacks(idleRunnable)
+        idleCheckPosted = false
         engine.abort(now)
         clearRound()
         gate.reset()
         comeCloser.reset()
         closeHint = false
         frame.clear()
+        lastSetVersion = frame.setVersion
         sleeping = false
+        countdownTicksSent = 0
+        elimTicksSent = 0
+        heavyFired = false
+        resultHoldElapsed = false
         clock.stop()
         syncDerived(now)
         invalidate()
@@ -208,13 +260,21 @@ class FaceOverlayView @JvmOverloads constructor(
     /**
      * A new tracker frame, on the UI thread. In IDLE it feeds the gate (and starts the round
      * when armed); during the countdown it moves the frozen participants' rings; afterwards it
-     * only refreshes the late faces. Always redraws: the positions changed.
+     * only refreshes the late faces. Redraws when the picture can have changed: a frame with
+     * faces, a frame that empties a view that showed rings, or anything but a steady IDLE.
      */
     fun onFrameArrived(frame: FaceFrame, debug: FaceSource.DebugBoxes?) {
         this.frame = frame
-        if (sleeping) return
+        if (sleeping || paused) return
         val now = SystemClock.uptimeMillis()
         nowMs = now
+        if (frame.setVersion != lastSetVersion) {
+            lastSetVersion = frame.setVersion
+            host?.onInteraction()
+        }
+        // A confirmed face is presence; the first frame after a reset also arms the lazy timer
+        // so an empty room still goes to sleep.
+        if (frame.confirmedCount > 0 || !idleCheckPosted) noteActivity(now)
         when (engine.phase) {
             ChooserEngine.Phase.IDLE -> {
                 gate.update(frame.confirmedCount, frame.setVersion, now)
@@ -236,7 +296,7 @@ class FaceOverlayView @JvmOverloads constructor(
         if (debugEnabled) rebuildDebug(frame, debug)
         syncDerived(now)
         updateLoop(now)
-        invalidate()
+        if (frame.count > 0 || !drawnEmpty || debugEnabled || engine.phase != ChooserEngine.Phase.IDLE) invalidate()
     }
 
     override fun onFrame(frameTimeMs: Long) {
@@ -259,20 +319,56 @@ class FaceOverlayView @JvmOverloads constructor(
 
     /** A tap on the overlay: wakes a sleeping camera, or re-arms a finished round. */
     fun tap() {
+        if (paused) return
         val now = SystemClock.uptimeMillis()
         nowMs = now
+        host?.onInteraction()
         if (sleeping) {
             sleeping = false
             host?.onCameraWake()
+            noteActivity(now)
             syncDerived(now)
             invalidate()
             return
         }
+        noteActivity(now)
         if (engine.phase == ChooserEngine.Phase.RESULT && engine.requestRearm(true, now)) {
             removeCallbacks(sleepRunnable)
             haptics.tick(this)
             tick(now)
             invalidate()
+        }
+    }
+
+    // ---- Idle sleep --------------------------------------------------------------------
+
+    /**
+     * Presence at [now]: pushes the idle sleep back and makes sure one check is posted. Costs
+     * an assignment per frame; the Handler is touched only when no check is pending.
+     */
+    private fun noteActivity(now: Long) {
+        idleSleep.activity(now)
+        if (!idleCheckPosted && !paused && !sleeping) {
+            idleCheckPosted = true
+            postDelayed(idleRunnable, idleSleep.delayMs(now))
+        }
+    }
+
+    /**
+     * The lazy check: sleeps when the timeout elapsed, re-posts for the remainder otherwise.
+     * Outside IDLE it simply stops: a result has its own sleep timer, and the return to IDLE
+     * ([syncDerived]) re-arms this one.
+     */
+    private fun checkIdle() {
+        idleCheckPosted = false
+        if (paused || sleeping || engine.phase != ChooserEngine.Phase.IDLE) return
+        val now = SystemClock.uptimeMillis()
+        val delay = idleSleep.delayMs(now)
+        if (delay == 0L) {
+            enterSleep()
+        } else {
+            idleCheckPosted = true
+            postDelayed(idleRunnable, delay)
         }
     }
 
@@ -298,6 +394,7 @@ class FaceOverlayView @JvmOverloads constructor(
         gate.reset()
         comeCloser.reset()
         closeHint = false
+        host?.onInteraction()
         // The confirm doubles as the countdown's first tick.
         haptics.confirm(this)
         countdownTicksSent = 1
@@ -309,6 +406,7 @@ class FaceOverlayView @JvmOverloads constructor(
 
     /** One step of the clocks: advances the engine, emits what changed, decides the loop. */
     private fun tick(now: Long) {
+        if (paused) return
         engine.tick(now)
         if (engine.phase == ChooserEngine.Phase.IDLE && !sleeping && gate.armed(now)) {
             startRound(now)
@@ -361,6 +459,8 @@ class FaceOverlayView @JvmOverloads constructor(
         if (phase == ChooserEngine.Phase.IDLE && roundLive) {
             clearRound()
             gate.reset()
+            // A round just ended: the idle clock starts again from here.
+            noteActivity(now)
         }
         val wantAnalyzer = phase == ChooserEngine.Phase.IDLE ||
             phase == ChooserEngine.Phase.COUNTDOWN ||
@@ -409,12 +509,18 @@ class FaceOverlayView @JvmOverloads constructor(
         roundLive = false
     }
 
+    /** Releases the camera (untouched result, or nobody in front of it); a tap brings it back. */
     private fun enterSleep() {
         val now = SystemClock.uptimeMillis()
         nowMs = now
+        removeCallbacks(sleepRunnable)
+        removeCallbacks(idleRunnable)
+        idleCheckPosted = false
         engine.abort(now)
         clearRound()
         gate.reset()
+        comeCloser.reset()
+        closeHint = false
         frame.clear()
         clock.stop()
         sleeping = true
@@ -427,6 +533,8 @@ class FaceOverlayView @JvmOverloads constructor(
         clock.stop()
         removeCallbacks(sleepRunnable)
         removeCallbacks(holdRunnable)
+        removeCallbacks(idleRunnable)
+        idleCheckPosted = false
         super.onDetachedFromWindow()
     }
 
@@ -470,8 +578,13 @@ class FaceOverlayView @JvmOverloads constructor(
     // ---- Drawing (no allocation) -------------------------------------------------------
 
     override fun onDraw(canvas: Canvas) {
-        if (sleeping) return
+        if (sleeping || paused) {
+            drawnEmpty = true
+            return
+        }
         val now = nowMs
+        // Only a steady IDLE with no face draws nothing; every other phase paints something.
+        drawnEmpty = engine.phase == ChooserEngine.Phase.IDLE && frame.count == 0 && !debugEnabled
         when (engine.phase) {
             ChooserEngine.Phase.IDLE -> drawIdle(canvas, now)
             ChooserEngine.Phase.COUNTDOWN -> {
@@ -658,6 +771,13 @@ class FaceOverlayView @JvmOverloads constructor(
         /** "Come closer" when every confirmed ring is under 60 dp for 3 s. */
         const val COME_CLOSER_MIN_DP = 60f
         const val COME_CLOSER_HOLD_MS = 3_000L
+
+        /**
+         * An IDLE screen with no confirmed face, tap or round for three minutes releases the
+         * camera: the same patience as the finger arena's keep-screen-on, so a phone propped up
+         * before the players arrive does not stream and detect for hours.
+         */
+        const val IDLE_SLEEP_MS = 3L * 60L * 1000L
 
         // Alphas and scales.
         private const val GLOW_ALPHA = 0.25f

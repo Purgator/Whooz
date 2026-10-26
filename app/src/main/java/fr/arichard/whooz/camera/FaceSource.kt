@@ -20,6 +20,7 @@ import com.google.mlkit.vision.face.FaceDetectorOptions
 import fr.arichard.whooz.core.Timings
 import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * ML Kit face detection turned into [FaceFrame]s in view pixels.
@@ -36,16 +37,28 @@ import java.util.concurrent.atomic.AtomicBoolean
  * 3. the four corners go through the analysis→view [Matrix] (inverse of CameraX's
  *    sensor→buffer matrix followed by the PreviewView's sensor→view transform, which already
  *    contains the FILL_CENTER crop, the display rotation and the front-camera mirroring);
- * 4. the mapped corners' bounding box becomes a ring through [FaceGeometry.ringFromRect].
+ * 4. the mapped corners' bounding box becomes a ring through [FaceGeometry.ringFromRect];
+ * 5. a ring whose centre falls outside the view ([FaceClip]) is dropped: the FILL_CENTER
+ *    preview crops a band on both sides of the 4:3 sensor image that ML Kit still sees, and a
+ *    face nobody can see on screen must not play.
  *
  * The analysis→view matrix is computed on the UI thread (PreviewView demands it) and copied here
  * under a tiny lock; the UI thread refreshes it after every posted frame and on every layout, so
- * a transform that CameraX delivers late is picked up by the next frame instead of never.
+ * a transform that CameraX delivers late is picked up by the next frame instead of never. The
+ * view size used by the clip comes the same way, from the layout listener, as two volatile ints.
  *
  * Frames are triple-buffered by copy: the tracker writes its own back frame, copies it into a
  * shared frame under the lock, and the UI runnable copies the shared frame into the one the
  * overlay draws. A plain two-buffer swap would let the writer reuse the frame the overlay is
- * still drawing; three 16-entry copies per frame cost nothing.
+ * still drawing; three 16-entry copies per frame cost nothing. An empty frame following an
+ * empty frame with the same set version is not posted at all: nothing on screen can change, and
+ * waking the UI thread 15 times a second to redraw nothing is exactly the kind of idle cost the
+ * battery rule forbids.
+ *
+ * The in-flight [ImageProxy] lives in an [AtomicReference] so that whoever comes last, the
+ * completion on the analysis thread or [release] on the UI thread, closes it: after release the
+ * executor rejects ML Kit's completion, and an unclosed proxy would keep CameraX's analysis
+ * ImageReader and its native buffers alive until the finalizer.
  *
  * Unavoidable per-frame allocations, all outside draw paths: the [InputImage] wrapper and the
  * continuation the Task API builds around the (preallocated) completion listener.
@@ -151,11 +164,25 @@ class FaceSource(private val analysisExecutor: Executor, timings: Timings) {
     private var clearRequested = false
     private val postPending = AtomicBoolean(false)
 
+    /**
+     * Overlay size in pixels for the visibility clip; written by the layout listener on the UI
+     * thread, read once per frame on the analysis thread. Zero until the first layout.
+     */
+    @Volatile
+    private var viewWidth = 0
+    @Volatile
+    private var viewHeight = 0
+
+    /** False forces the next frame to be posted, whatever it contains (see class doc). */
+    @Volatile
+    private var lastPostedEmpty = false
+    private var lastPostedSetVersion = 0
+
     // ---- Per-frame scratch (analysis thread) --------------------------------------------
     private val rect = FloatArray(4)
     private val points = FloatArray(8)
     private val ring = FloatArray(3)
-    private var pendingProxy: ImageProxy? = null
+    private val pendingProxy = AtomicReference<ImageProxy?>(null)
     private var rotation = 0
     private var bufferW = 0
     private var bufferH = 0
@@ -228,19 +255,31 @@ class FaceSource(private val analysisExecutor: Executor, timings: Timings) {
                 Log.w(TAG, "Detector close failed: $e")
             }
         }
+        // The frame inside ML Kit, if any: its completion may never reach the analysis thread
+        // now that the executor is going away, and CameraX needs every proxy back.
+        closePending()
     }
 
     /**
      * Asks the analysis thread to forget every track before its next update (re-arm, re-bind,
      * pause). The shared frame is emptied at once so a runnable already in flight cannot hand
-     * the overlay a stale set.
+     * the overlay a stale set, and the next frame is posted whatever it holds so the overlay
+     * sees the cleared state.
      */
     fun requestClear() {
         clearRequested = true
+        lastPostedEmpty = false
         synchronized(lock) {
             sharedFrame.clear()
             sharedDebug.count = 0
         }
+    }
+
+    /** The overlay's size, from the PreviewView layout listener; faces outside it are dropped. */
+    @UiThread
+    fun setViewSize(width: Int, height: Int) {
+        viewWidth = width
+        viewHeight = height
     }
 
     /** True while a frame is inside ML Kit; the analyzer drops frames meanwhile. */
@@ -303,24 +342,31 @@ class FaceSource(private val analysisExecutor: Executor, timings: Timings) {
         bufferW = proxy.width
         bufferH = proxy.height
         busy.set(true)
-        pendingProxy = proxy
+        pendingProxy.set(proxy)
         try {
             val input = InputImage.fromMediaImage(image, rotation)
             det.process(input).addOnCompleteListener(analysisExecutor, completeListener)
         } catch (e: Exception) {
             Log.w(TAG, "process() threw: $e")
-            pendingProxy = null
-            proxy.close()
+            closePending()
             busy.set(false)
             if (isModelUnavailable(e)) mainHandler.post(reportUnavailable)
         }
     }
 
-    private fun onComplete(task: Task<List<Face>>) {
-        val proxy = pendingProxy
-        pendingProxy = null
+    /** Closes the in-flight proxy, once, whichever thread gets here first. */
+    private fun closePending() {
         // Closing the proxy (never the MediaImage) hands the buffer back to CameraX.
-        proxy?.close()
+        pendingProxy.getAndSet(null)?.close()
+    }
+
+    private fun onComplete(task: Task<List<Face>>) {
+        closePending()
+        if (released) {
+            // Nothing to track for any more; the proxy above was the only thing owed.
+            busy.set(false)
+            return
+        }
         try {
             if (task.isSuccessful) {
                 val faces = task.result
@@ -345,6 +391,8 @@ class FaceSource(private val analysisExecutor: Executor, timings: Timings) {
             tracker.clear()
         }
         val debug = debugEnabled
+        val viewW = viewWidth
+        val viewH = viewHeight
         observations.clear()
         backDebug.count = 0
         val n = faces.size
@@ -375,12 +423,15 @@ class FaceSource(private val analysisExecutor: Executor, timings: Timings) {
                 if (y > maxY) maxY = y
             }
             FaceGeometry.ringFromRect(minX, minY, maxX, maxY, ring)
-            val id = face.trackingId ?: -1
-            if (!observations.add(id, ring[0], ring[1], ring[2])) break
+            // The raw box is kept for the debug overlay even when clipped: seeing what the
+            // crop drops is the point of that overlay.
             if (debug && backDebug.count < FaceObservations.CAPACITY) {
                 System.arraycopy(points, 0, backDebug.quads, backDebug.count * 8, 8)
                 backDebug.count++
             }
+            if (!FaceClip.isVisible(ring[0], ring[1], ring[2], viewW, viewH)) continue
+            val id = face.trackingId ?: -1
+            if (!observations.add(id, ring[0], ring[1], ring[2])) break
         }
         tracker.update(observations, nowMs)
         tracker.writeTo(backFrame)
@@ -393,6 +444,12 @@ class FaceSource(private val analysisExecutor: Executor, timings: Timings) {
         } else {
             backDebug.transformValid = false
         }
+        // Empty after empty with the same set: the overlay already shows nothing, so neither
+        // the copy nor the UI wake-up buys anything (debug keeps posting: the raw boxes move).
+        val empty = backFrame.count == 0
+        if (empty && lastPostedEmpty && backFrame.setVersion == lastPostedSetVersion && !debug) return
+        lastPostedEmpty = empty
+        lastPostedSetVersion = backFrame.setVersion
         synchronized(lock) {
             sharedFrame.copyFrom(backFrame)
             sharedDebug.copyFrom(backDebug)

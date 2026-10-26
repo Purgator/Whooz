@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings as SystemSettings
 import android.view.View
 import android.view.WindowManager
@@ -34,10 +36,16 @@ import fr.arichard.whooz.ui.Haptics
  * chrome visibility, hints, sub-mode pill and the debug toggle.
  *
  * Nothing is bound before CAMERA is granted; CameraX unbinds through the lifecycle in
- * `onStop`, `onPause` resets the overlay so no round survives a pause, and `onDestroy`
- * releases the session (detector, analysis thread). The back key simply finishes: the last
- * mode stays CAMERA so a camera-only group reopens straight into this screen; only the finger
- * icon writes FINGER back.
+ * `onStop`, `onPause` resets the overlay and stops the analyzer so no round can start or
+ * survive a pause (the camera keeps streaming while the activity is merely paused: Recents, a
+ * dialog, an incoming call), and `onDestroy` releases the session (detector, analysis thread).
+ * The back key simply finishes: the last mode stays CAMERA so a camera-only group reopens
+ * straight into this screen; only the finger icon writes FINGER back.
+ *
+ * Screen and battery rules mirror [MainActivity]: the screen stays on for three minutes after
+ * the last interaction (tap, change of the confirmed-face set, round start, as reported by the
+ * overlay), then falls back to the system timeout; the flag is also dropped when the overlay
+ * puts the camera to sleep, since a released camera has nothing to keep the screen on for.
  */
 class CameraActivity : AppCompatActivity(), FaceOverlayView.Host, FaceSource.Listener, CameraSession.Listener {
 
@@ -61,12 +69,38 @@ class CameraActivity : AppCompatActivity(), FaceOverlayView.Host, FaceSource.Lis
     private var permissionDenied = false
     private var permissionRequested = false
 
+    /**
+     * Whether the system was still willing to show the permission dialog when it was last
+     * requested. On Android 11+ `shouldShowRequestPermissionRationale` is false both before the
+     * first explicit denial and after the final one, so a denial is "permanent" only when the
+     * rationale flag was true before the request and false after it: the dialog was shown once
+     * and the user shut the door. A first dialog dismissed with a swipe or interrupted by a call
+     * reports a denial with the flag still false, and must simply be asked again.
+     */
+    private var rationaleBefore = false
+
+    /**
+     * Denials that came back with the rationale flag false on both sides. One is a dismissed
+     * dialog; two in a row means the system is auto-denying (the door was shut in an earlier
+     * session), since a dialog that was actually shown and denied sets the flag.
+     */
+    private var noRationaleDenials = 0
+
     /** True after the overlay asked for the camera to sleep; a tap on it rebinds. */
     private var sleeping = false
 
     private var cameraUnavailable = false
 
-    private val refreshTransform = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+    private val handler = Handler(Looper.getMainLooper())
+    private val keepScreenOffRunnable = Runnable { dropKeepScreenOn() }
+    private var keepScreenOn = true
+
+    /** Tracks the window flag locally: setting it again forces a relayout IPC for nothing. */
+    private var keepScreenOnHeld = false
+
+    private val refreshTransform = View.OnLayoutChangeListener { _, left, top, right, bottom, _, _, _, _ ->
+        // The overlay shares the PreviewView's bounds: the source clips faces to this size.
+        session.faceSource.setViewSize(right - left, bottom - top)
         session.refreshTransform()
     }
 
@@ -128,11 +162,14 @@ class CameraActivity : AppCompatActivity(), FaceOverlayView.Host, FaceSource.Lis
         permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) {
                 permissionDenied = false
+                noRationaleDenials = 0
                 permissionCard.visibility = View.GONE
                 bindIfGranted()
             } else {
                 permissionDenied = true
-                val permanent = !shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)
+                val rationaleAfter = shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)
+                if (!rationaleBefore && !rationaleAfter) noRationaleDenials++ else noRationaleDenials = 0
+                val permanent = !rationaleAfter && (rationaleBefore || noRationaleDenials >= 2)
                 showPermissionCard(permanent)
             }
         }
@@ -146,12 +183,8 @@ class CameraActivity : AppCompatActivity(), FaceOverlayView.Host, FaceSource.Lis
     override fun onResume() {
         super.onResume()
         applyImmersive()
-        val keepOn = settings.keepScreenOn
-        if (keepOn) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        } else {
-            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
+        keepScreenOn = settings.keepScreenOn
+        if (keepScreenOn) armKeepScreenOn() else dropKeepScreenOn()
         overlay.configure(Timings.camera(settings.stabilization), Haptics(this, settings.haptics), settings.cameraMode)
         selectMode(settings.cameraMode, persist = false)
         chrome.setVisibleNow(true)
@@ -160,16 +193,46 @@ class CameraActivity : AppCompatActivity(), FaceOverlayView.Host, FaceSource.Lis
 
     override fun onPause() {
         super.onPause()
-        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        dropKeepScreenOn()
+        // The overlay first: its reset re-syncs the analyzer request to "wanted", which the
+        // session then overrides until the next bind. CameraX keeps streaming while paused, and
+        // a Recents thumbnail with two faces in it must not start a round in the background.
         overlay.resetAll()
+        session.setAnalyzerEnabled(false)
         session.faceSource.pause()
         sleeping = false
     }
 
     override fun onDestroy() {
+        handler.removeCallbacks(keepScreenOffRunnable)
         previewView.removeOnLayoutChangeListener(refreshTransform)
         session.release()
         super.onDestroy()
+    }
+
+    // ---- Keep screen on ----------------------------------------------------------------
+
+    /**
+     * Keeps the screen on for three minutes after the last interaction, then lets the system
+     * timeout apply so a phone forgotten in camera mode does not burn its battery at full
+     * brightness. Re-arming only reschedules the runnable: the flag is added once.
+     */
+    private fun armKeepScreenOn() {
+        if (!keepScreenOn) return
+        if (!keepScreenOnHeld) {
+            keepScreenOnHeld = true
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        handler.removeCallbacks(keepScreenOffRunnable)
+        handler.postDelayed(keepScreenOffRunnable, KEEP_SCREEN_ON_MS)
+    }
+
+    private fun dropKeepScreenOn() {
+        handler.removeCallbacks(keepScreenOffRunnable)
+        if (keepScreenOnHeld) {
+            keepScreenOnHeld = false
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -184,6 +247,7 @@ class CameraActivity : AppCompatActivity(), FaceOverlayView.Host, FaceSource.Lis
 
     private fun requestPermission() {
         permissionRequested = true
+        rationaleBefore = shouldShowRequestPermissionRationale(Manifest.permission.CAMERA)
         permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
@@ -204,12 +268,18 @@ class CameraActivity : AppCompatActivity(), FaceOverlayView.Host, FaceSource.Lis
         }
     }
 
-    /** Binds the camera once the permission is there; idempotent per resume. */
+    /**
+     * Binds the camera once the permission is there; idempotent (a session already bound to
+     * this activity is left alone, see [CameraSession.bind]). Enabling the analyzer first undoes
+     * the pause and, on a session that stays bound, clears the old tracks and the throttle,
+     * which is all a resume needs.
+     */
     private fun bindIfGranted() {
         if (!hasCameraPermission() || cameraUnavailable || sleeping) return
         permissionCard.visibility = View.GONE
         if (hint.text.isEmpty()) hint.setText(R.string.hint_camera_idle)
         session.faceSource.start()
+        session.setAnalyzerEnabled(true)
         session.bind(this)
     }
 
@@ -279,11 +349,17 @@ class CameraActivity : AppCompatActivity(), FaceOverlayView.Host, FaceSource.Lis
     override fun onCameraSleep() {
         sleeping = true
         session.unbindAll()
+        // A released camera has nothing to keep the screen on for.
+        dropKeepScreenOn()
     }
 
     override fun onCameraWake() {
         sleeping = false
         bindIfGranted()
+    }
+
+    override fun onInteraction() {
+        armKeepScreenOn()
     }
 
     // ---- FaceSource.Listener -----------------------------------------------------------
@@ -318,5 +394,10 @@ class CameraActivity : AppCompatActivity(), FaceOverlayView.Host, FaceSource.Lis
         banner.visibility = View.VISIBLE
         bannerText.setText(text)
         bannerAction.visibility = if (action) View.VISIBLE else View.GONE
+    }
+
+    companion object {
+        /** Screen stays on this long after the last interaction, as in the finger arena. */
+        private const val KEEP_SCREEN_ON_MS = 3L * 60L * 1000L
     }
 }

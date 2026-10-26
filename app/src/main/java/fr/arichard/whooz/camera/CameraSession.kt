@@ -36,7 +36,15 @@ import java.util.concurrent.RejectedExecutionException
  * The lambdas here capture only this session and its [FaceSource], never the activity, so a
  * provider future resolving after the screen is gone cannot leak it. The executor rejects
  * nothing after [release]: ML Kit's completion is posted through [safeExecutor], which swallows
- * the rejection instead of crashing the Task thread.
+ * the rejection instead of crashing the Task thread; the proxy that completion would have
+ * closed is closed by [FaceSource.release] instead.
+ *
+ * [bind] is idempotent for the same owner: the use cases are bound to the activity lifecycle,
+ * so CameraX already closes the camera on `onStop` and reopens it on `onStart`, and a resume
+ * must not unbind and rebind on top of that (every open costs hundreds of milliseconds of HAL
+ * work and a black preview). The full unbind-and-bind path runs only for the first bind, after
+ * [unbindAll] (sleep) or for a different owner; [setAnalyzerEnabled] gives the resume path the
+ * tracker clear and throttle reset it needs.
  */
 class CameraSession(context: Context, private val previewView: PreviewView, timings: Timings) {
 
@@ -112,13 +120,15 @@ class CameraSession(context: Context, private val previewView: PreviewView, timi
     }
 
     /**
-     * Binds (or re-binds) preview and analysis to [lifecycleOwner]. Safe to call again after
-     * [unbindAll] or on every `onResume`: the previous binding is dropped first. Nothing happens
-     * before the provider future resolves, and nothing happens after [release].
+     * Binds preview and analysis to [lifecycleOwner]. Safe to call on every `onResume`: a
+     * session already bound to the same owner is left alone (see the class doc), a different
+     * owner or a session released by [unbindAll] gets a fresh binding. Nothing happens before
+     * the provider future resolves, and nothing happens after [release].
      */
     @UiThread
     fun bind(lifecycleOwner: LifecycleOwner) {
         if (released) return
+        if (bound && owner === lifecycleOwner) return
         owner = lifecycleOwner
         bindRequested = true
         val p = provider
@@ -170,8 +180,9 @@ class CameraSession(context: Context, private val previewView: PreviewView, timi
 
     /**
      * Starts or stops face detection without touching the preview: off while a round is being
-     * decided (rings freeze), on again when the screen re-arms. Enabling also forgets the
-     * tracker's old tracks, since faces may have moved while nobody watched.
+     * decided (rings freeze) and while the screen is paused (a Recents thumbnail must not start a
+     * round), on again when the screen re-arms or resumes. Enabling also forgets the tracker's
+     * old tracks, since faces may have moved while nobody watched.
      */
     @UiThread
     fun setAnalyzerEnabled(enabled: Boolean) {
