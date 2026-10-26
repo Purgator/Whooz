@@ -1,0 +1,9 @@
+<resources>
+    <dimen name="chrome_button">40dp</dimen>
+    <dimen name="chrome_margin">16dp</dimen>
+    <dimen name="hint_text">18sp</dimen>
+    <dimen name="hint_text_small">14sp</dimen>
+    <dimen name="pill_text">14sp</dimen>
+    <dimen name="settings_row_height">56dp</dimen>
+    <dimen name="settings_padding">20dp</dimen>
+</resources>

@@ -1,3 +1,77 @@
 <resources>
     <string name="app_name">Whooz</string>
+
+    <!-- Finger mode hints -->
+    <string name="hint_idle">Everyone, put one finger on the screen</string>
+    <string name="hint_idle_short">Put your fingers down</string>
+    <string name="hint_one_more">Need one more finger</string>
+    <string name="hint_hold_still">Hold still…</string>
+    <string name="hint_lift_to_replay">Lift to play again</string>
+    <string name="hint_too_many">Too many fingers</string>
+    <string name="caption_bottom_edge">Keep fingers away from the very bottom edge</string>
+
+    <!-- Camera mode hints -->
+    <string name="hint_camera_idle">Everyone, look at the camera</string>
+    <string name="hint_camera_tap_again">Tap to play again</string>
+    <string name="hint_come_closer">Come closer</string>
+    <string name="hint_back_camera">Using back camera</string>
+    <string name="hint_camera_sleeping">Tap to scan again</string>
+    <string name="perm_camera_title">Camera access needed</string>
+    <string name="perm_camera_body">Whooz uses the selfie camera to find the players. Nothing is recorded.</string>
+    <string name="perm_allow">Allow camera</string>
+    <string name="perm_open_settings">Open settings</string>
+    <string name="perm_use_finger">Use finger mode</string>
+    <string name="mlkit_downloading">Face model is being downloaded by Google Play services…</string>
+    <string name="mlkit_unavailable">Camera mode needs Google Play services — use Finger mode</string>
+
+    <!-- Sub-modes -->
+    <string name="mode_winner_1">Pick 1</string>
+    <string name="mode_winner_2">Pick 2</string>
+    <string name="mode_winner_3">Pick 3</string>
+    <string name="mode_order">Order</string>
+    <string name="mode_teams_2">2 teams</string>
+    <string name="mode_teams_3">3 teams</string>
+
+    <!-- Chrome -->
+    <string name="cd_camera">Camera mode</string>
+    <string name="cd_finger">Finger mode</string>
+    <string name="cd_settings">Settings</string>
+    <string name="cd_close">Close</string>
+    <string name="cd_back">Back</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_delay">Stabilization delay</string>
+    <string name="settings_delay_summary">How long everyone holds still before the draw</string>
+    <string name="settings_delay_fast">Fast</string>
+    <string name="settings_delay_normal">Normal</string>
+    <string name="settings_delay_slow">Slow</string>
+    <string name="settings_haptics">Haptics</string>
+    <string name="settings_haptics_summary">Vibrate on each tick and on the reveal</string>
+    <string name="settings_keep_screen_on">Keep screen on</string>
+    <string name="settings_keep_screen_on_summary">While a round is on the screen</string>
+    <string name="settings_remember_mode">Remember last mode</string>
+    <string name="settings_remember_mode_summary">Open straight into the mode you used last</string>
+    <string name="settings_auto_update">Auto-update over Wi-Fi</string>
+    <string name="settings_auto_update_summary">Checks GitHub once a day, installs after your tap</string>
+    <string name="settings_check_now">Check for updates now</string>
+    <string name="settings_version">Version %1$s (%2$d)</string>
+    <string name="settings_github">Open on GitHub</string>
+    <string name="settings_licenses">Open-source licences</string>
+    <string name="settings_about_section">About</string>
+    <string name="settings_play_section">Play</string>
+    <string name="settings_updates_section">Updates</string>
+
+    <!-- Updates -->
+    <string name="update_ready">Whooz v%1$s is ready</string>
+    <string name="update_install">Install</string>
+    <string name="update_later">Later</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_up_to_date">You are up to date</string>
+    <string name="update_downloaded">Update downloaded — go back to install</string>
+    <string name="update_no_network">No connection</string>
+    <string name="update_wifi_pending">Update will download on Wi-Fi</string>
+    <string name="update_failed">Install failed: %1$s</string>
+    <string name="update_open_file">Open the APK instead</string>
+    <string name="update_installed">Update installed</string>
 </resources>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- Allocation inside onDraw/onTouchEvent is a frame-time bug in this app, not a style issue. -->
+    <issue id="DrawAllocation" severity="error" />
+    <issue id="MissingPermission" severity="error" />
+    <issue id="NewApi" severity="error" />
+    <issue id="UnusedResources" severity="error" />
+</lint>

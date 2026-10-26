@@ -1,18 +1,11 @@
 <resources>
-    <color name="deep_space">#0A0E1A</color>
+    <!-- Arena background; must match Palette.BACKGROUND. -->
+    <color name="arena">#0B0E14</color>
+    <color name="deep_space">#0B0E14</color>
+    <color name="surface">#141924</color>
+    <color name="surface_stroke">#2EFFFFFF</color>
     <color name="text_primary">#F2F5FF</color>
     <color name="text_secondary">#9BA3B7</color>
-    <color name="accent">#00E5FF</color>
-
-    <!-- Player palette: vivid, distinguishable, pleasant on a dark arena. -->
-    <color name="player_1">#00E5FF</color>
-    <color name="player_2">#FF4081</color>
-    <color name="player_3">#FFD740</color>
-    <color name="player_4">#69F0AE</color>
-    <color name="player_5">#B388FF</color>
-    <color name="player_6">#FF6E40</color>
-    <color name="player_7">#40C4FF</color>
-    <color name="player_8">#EEFF41</color>
-    <color name="player_9">#FF80AB</color>
-    <color name="player_10">#64FFDA</color>
+    <color name="accent">#3BE8FF</color>
+    <color name="chrome_ghost">#66FFFFFF</color>
 </resources>

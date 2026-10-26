@@ -1,3 +1,77 @@
 <resources>
     <string name="app_name">Whooz</string>
+
+    <!-- Finger mode hints -->
+    <string name="hint_idle">Chacun pose un doigt sur l\'écran</string>
+    <string name="hint_idle_short">Posez vos doigts</string>
+    <string name="hint_one_more">Il manque un doigt</string>
+    <string name="hint_hold_still">Ne bougez plus…</string>
+    <string name="hint_lift_to_replay">Levez les doigts pour rejouer</string>
+    <string name="hint_too_many">Trop de doigts</string>
+    <string name="caption_bottom_edge">Évitez le bord tout en bas de l\'écran</string>
+
+    <!-- Camera mode hints -->
+    <string name="hint_camera_idle">Tout le monde regarde la caméra</string>
+    <string name="hint_camera_tap_again">Touchez pour rejouer</string>
+    <string name="hint_come_closer">Rapprochez-vous</string>
+    <string name="hint_back_camera">Caméra arrière utilisée</string>
+    <string name="hint_camera_sleeping">Touchez pour relancer</string>
+    <string name="perm_camera_title">Accès à la caméra requis</string>
+    <string name="perm_camera_body">Whooz utilise la caméra selfie pour repérer les joueurs. Rien n\'est enregistré.</string>
+    <string name="perm_allow">Autoriser la caméra</string>
+    <string name="perm_open_settings">Ouvrir les réglages</string>
+    <string name="perm_use_finger">Mode doigts</string>
+    <string name="mlkit_downloading">Google Play services télécharge le modèle de visages…</string>
+    <string name="mlkit_unavailable">Le mode caméra nécessite Google Play services — utilisez le mode doigts</string>
+
+    <!-- Sub-modes -->
+    <string name="mode_winner_1">1 gagnant</string>
+    <string name="mode_winner_2">2 gagnants</string>
+    <string name="mode_winner_3">3 gagnants</string>
+    <string name="mode_order">Ordre</string>
+    <string name="mode_teams_2">2 équipes</string>
+    <string name="mode_teams_3">3 équipes</string>
+
+    <!-- Chrome -->
+    <string name="cd_camera">Mode caméra</string>
+    <string name="cd_finger">Mode doigts</string>
+    <string name="cd_settings">Réglages</string>
+    <string name="cd_close">Fermer</string>
+    <string name="cd_back">Retour</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Réglages</string>
+    <string name="settings_delay">Délai de stabilisation</string>
+    <string name="settings_delay_summary">Temps d\'immobilité avant le tirage</string>
+    <string name="settings_delay_fast">Rapide</string>
+    <string name="settings_delay_normal">Normal</string>
+    <string name="settings_delay_slow">Lent</string>
+    <string name="settings_haptics">Vibrations</string>
+    <string name="settings_haptics_summary">Vibrer à chaque tic et à la révélation</string>
+    <string name="settings_keep_screen_on">Garder l\'écran allumé</string>
+    <string name="settings_keep_screen_on_summary">Tant qu\'une partie est à l\'écran</string>
+    <string name="settings_remember_mode">Retenir le dernier mode</string>
+    <string name="settings_remember_mode_summary">Ouvrir directement le mode utilisé en dernier</string>
+    <string name="settings_auto_update">Mise à jour auto en Wi-Fi</string>
+    <string name="settings_auto_update_summary">Vérifie GitHub une fois par jour, installe après votre accord</string>
+    <string name="settings_check_now">Vérifier les mises à jour</string>
+    <string name="settings_version">Version %1$s (%2$d)</string>
+    <string name="settings_github">Ouvrir sur GitHub</string>
+    <string name="settings_licenses">Licences open source</string>
+    <string name="settings_about_section">À propos</string>
+    <string name="settings_play_section">Jeu</string>
+    <string name="settings_updates_section">Mises à jour</string>
+
+    <!-- Updates -->
+    <string name="update_ready">Whooz v%1$s est prêt</string>
+    <string name="update_install">Installer</string>
+    <string name="update_later">Plus tard</string>
+    <string name="update_checking">Vérification…</string>
+    <string name="update_up_to_date">Vous êtes à jour</string>
+    <string name="update_downloaded">Mise à jour téléchargée — revenez en arrière pour l\'installer</string>
+    <string name="update_no_network">Pas de connexion</string>
+    <string name="update_wifi_pending">La mise à jour se téléchargera en Wi-Fi</string>
+    <string name="update_failed">Échec de l\'installation : %1$s</string>
+    <string name="update_open_file">Ouvrir l\'APK à la place</string>
+    <string name="update_installed">Mise à jour installée</string>
 </resources>

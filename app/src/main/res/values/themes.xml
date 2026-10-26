@@ -1,18 +1,15 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Settings and dialogs: forced dark, deep-space surface. -->
-    <style name="Theme.Whooz" parent="Theme.Material3.Dark.NoActionBar">
+    <!-- One dark theme for every screen. The window background is exactly the arena color so
+         the very first frame is already right and the decor never overdraws the views. -->
+    <style name="Theme.Whooz" parent="Theme.AppCompat.NoActionBar">
         <item name="colorPrimary">@color/accent</item>
-        <item name="colorSecondary">@color/accent</item>
-        <item name="android:colorBackground">@color/deep_space</item>
-        <item name="colorSurface">@color/deep_space</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:colorBackground">@color/arena</item>
+        <item name="android:windowBackground">@color/arena</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
-    </style>
-
-    <!-- The arena: edge to edge, nothing but the dark surface and the players. -->
-    <style name="Theme.Whooz.Arena">
-        <item name="android:windowBackground">@color/deep_space</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="o_mr1">shortEdges</item>
     </style>

@@ -16,6 +16,8 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
+        resourceConfigurations += listOf("en", "fr")
+        vectorDrawables.useSupportLibrary = true
     }
 
     // Optional release signing: reads keystore.properties at the repo root when present.
@@ -49,6 +51,12 @@ android {
     buildFeatures {
         buildConfig = true
     }
+
+    lint {
+        abortOnError = true
+        warningsAsErrors = false
+        lintConfig = file("lint.xml")
+    }
 }
 
 kotlin {
@@ -58,9 +66,17 @@ kotlin {
 }
 
 dependencies {
+    // Every version below declares minCompileSdk <= 34; bumping any of them needs the
+    // AAR-metadata check (core 1.15+, activity 1.10+, CameraX 1.5+ require compileSdk 35).
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
-    implementation("com.google.android.material:material:1.12.0")
-    implementation("androidx.preference:preference-ktx:1.2.1")
+    implementation("androidx.activity:activity-ktx:1.9.3")
+    implementation("androidx.camera:camera-core:1.4.2")
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
+    // Unbundled ML Kit: ~800 KB, the face model comes from Google Play services.
+    implementation("com.google.android.gms:play-services-mlkit-face-detection:17.1.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }
