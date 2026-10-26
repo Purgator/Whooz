@@ -1,0 +1,4 @@
+<resources>
+    <!-- Camera screen extras (the shared keys live in strings.xml). -->
+    <string name="camera_unavailable">Aucune caméra utilisable — utilisez le mode doigts</string>
+</resources>
