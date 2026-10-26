@@ -69,6 +69,14 @@ class Settings(context: Context) {
         get() = prefs.getLong(KEY_UPDATE_DISMISSED_AT, 0L)
         set(value) = prefs.edit().putLong(KEY_UPDATE_DISMISSED_AT, value).apply()
 
+    /**
+     * Version whose downloaded APK failed the archive checks (signer, versionCode): never
+     * downloaded again by the daily check, so a bad asset costs one transfer, not one a day.
+     */
+    var updateRejectedVersion: String
+        get() = prefs.getString(KEY_UPDATE_REJECTED, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_UPDATE_REJECTED, value).apply()
+
     companion object {
         private const val FILE = "whooz"
         private const val KEY_STABILIZATION = "stabilization"
@@ -85,5 +93,6 @@ class Settings(context: Context) {
         private const val KEY_UPDATE_DEFERRED = "update_deferred"
         private const val KEY_UPDATE_DISMISSED = "update_dismissed_version"
         private const val KEY_UPDATE_DISMISSED_AT = "update_dismissed_at"
+        private const val KEY_UPDATE_REJECTED = "update_rejected_version"
     }
 }

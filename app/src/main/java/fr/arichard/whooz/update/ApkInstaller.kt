@@ -64,7 +64,7 @@ object ApkInstaller {
         val app = context.applicationContext
         if (!apk.isFile || apk.length() <= 0L) {
             Log.w(TAG, "APK missing or empty: $apk")
-            toast(app, app.getString(R.string.update_failed, "file missing"))
+            toast(app, app.getString(R.string.update_failed, app.getString(R.string.update_error_file_missing)))
             return
         }
         try {
@@ -141,7 +141,10 @@ object ApkInstaller {
                 }
                 PackageInstaller.STATUS_FAILURE_ABORTED -> Log.i(TAG, "Install cancelled by the user")
                 else -> {
-                    val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "status $status"
+                    // The system message is whatever the installer provides (not localized by
+                    // us); only our own fallback for a missing message goes through strings.xml.
+                    val message = intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)
+                        ?: app.getString(R.string.update_error_status, status)
                     Log.w(TAG, "Install failed: $message")
                     toast(app, app.getString(R.string.update_failed, message))
                     val path = intent.getStringExtra(EXTRA_APK_PATH)

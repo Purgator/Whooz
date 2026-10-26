@@ -162,6 +162,7 @@ class SettingsActivity : AppCompatActivity() {
         UpdateManager.Status.UP_TO_DATE -> R.string.update_up_to_date
         UpdateManager.Status.UPDATE_READY -> R.string.update_downloaded
         UpdateManager.Status.UPDATE_DEFERRED -> R.string.update_wifi_pending
+        UpdateManager.Status.DOWNLOAD_FAILED -> R.string.update_download_failed
         UpdateManager.Status.NO_NETWORK -> R.string.update_no_network
         UpdateManager.Status.ERROR -> R.string.update_check_failed
     }

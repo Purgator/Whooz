@@ -70,7 +70,10 @@
     <string name="update_downloaded">Mise à jour téléchargée — revenez en arrière pour l\'installer</string>
     <string name="update_no_network">Pas de connexion</string>
     <string name="update_wifi_pending">La mise à jour se téléchargera en Wi-Fi</string>
+    <string name="update_download_failed">Téléchargement interrompu — nouvel essai en Wi-Fi</string>
     <string name="update_failed">Échec de l\'installation : %1$s</string>
+    <string name="update_error_file_missing">le fichier téléchargé est introuvable</string>
+    <string name="update_error_status">code d\'erreur %1$d</string>
     <string name="update_open_file">Ouvrir l\'APK à la place</string>
     <string name="update_installed">Mise à jour installée</string>
 </resources>

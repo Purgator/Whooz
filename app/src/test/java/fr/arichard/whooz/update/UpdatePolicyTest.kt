@@ -3,6 +3,14 @@ package fr.arichard.whooz.update
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.EOFException
+import java.io.IOException
+import java.io.InterruptedIOException
+import java.net.ConnectException
+import java.net.SocketException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import javax.net.ssl.SSLException
 
 class UpdatePolicyTest {
 
@@ -74,5 +82,44 @@ class UpdatePolicyTest {
     fun onlyRealChecksMoveTheThrottle() {
         assertTrue(UpdatePolicy.recordsCheck(reachedServer = true))
         assertFalse(UpdatePolicy.recordsCheck(reachedServer = false))
+    }
+
+    @Test
+    fun connectionLossIsANetworkFailure() {
+        assertTrue(UpdatePolicy.isNetworkFailure(UnknownHostException("api.github.com")))
+        assertTrue(UpdatePolicy.isNetworkFailure(ConnectException("refused")))
+        assertTrue(UpdatePolicy.isNetworkFailure(SocketTimeoutException("read timed out")))
+        assertTrue(UpdatePolicy.isNetworkFailure(SSLException("handshake")))
+        // A Wi-Fi drop mid-download surfaces as one of these, never as a server error.
+        assertTrue(UpdatePolicy.isNetworkFailure(SocketException("Connection reset")))
+        assertTrue(UpdatePolicy.isNetworkFailure(SocketException("Software caused connection abort")))
+        assertTrue(UpdatePolicy.isNetworkFailure(EOFException()))
+        assertTrue(UpdatePolicy.isNetworkFailure(InterruptedIOException()))
+    }
+
+    @Test
+    fun serverAndContentErrorsAreNotNetworkFailures() {
+        assertFalse(UpdatePolicy.isNetworkFailure(IOException("HTTP 503")))
+        assertFalse(UpdatePolicy.isNetworkFailure(IOException("size mismatch")))
+        assertFalse(UpdatePolicy.isNetworkFailure(IllegalStateException()))
+        assertFalse(UpdatePolicy.isNetworkFailure(RuntimeException()))
+    }
+
+    @Test
+    fun rejectedVersionIsNotDownloadedAgainUnlessForced() {
+        assertTrue(UpdatePolicy.skipsRejected("1.2", "1.2", force = false))
+        assertFalse(UpdatePolicy.skipsRejected("1.2", "1.2", force = true))
+        assertFalse(UpdatePolicy.skipsRejected("1.3", "1.2", force = false))
+        assertFalse(UpdatePolicy.skipsRejected("1.2", "", force = false))
+        assertFalse(UpdatePolicy.skipsRejected("", "", force = false))
+    }
+
+    @Test
+    fun versionCodeMustNotGoDown() {
+        assertTrue(UpdatePolicy.acceptsVersionCode(archiveCode = 3L, installedCode = 2L))
+        assertTrue(UpdatePolicy.acceptsVersionCode(archiveCode = 2L, installedCode = 2L))
+        assertFalse(UpdatePolicy.acceptsVersionCode(archiveCode = 1L, installedCode = 2L))
+        assertFalse(UpdatePolicy.acceptsVersionCode(archiveCode = 0L, installedCode = 1L))
+        assertTrue(UpdatePolicy.acceptsVersionCode(archiveCode = 1L shl 40, installedCode = 1L))
     }
 }

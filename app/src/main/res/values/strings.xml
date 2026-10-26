@@ -70,7 +70,10 @@
     <string name="update_downloaded">Update downloaded — go back to install</string>
     <string name="update_no_network">No connection</string>
     <string name="update_wifi_pending">Update will download on Wi-Fi</string>
+    <string name="update_download_failed">Download interrupted — it will retry on Wi-Fi</string>
     <string name="update_failed">Install failed: %1$s</string>
+    <string name="update_error_file_missing">the downloaded file is missing</string>
+    <string name="update_error_status">installer status %1$d</string>
     <string name="update_open_file">Open the APK instead</string>
     <string name="update_installed">Update installed</string>
 </resources>
