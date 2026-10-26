@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Finger arena: the custom view fills the window, the chrome floats in a second layer that
+     receives the cutout/system-bar insets as padding (the arena itself stays edge-to-edge).
+     Every chrome view is hidden by MainActivity whenever a finger is down. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/arena">
+
+    <fr.arichard.whooz.finger.FingerChooserView
+        android:id="@+id/arena"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <FrameLayout
+        android:id="@+id/chrome_layer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false">
+
+        <ImageButton
+            android:id="@+id/btn_settings"
+            android:layout_width="@dimen/chrome_button"
+            android:layout_height="@dimen/chrome_button"
+            android:layout_gravity="top|start"
+            android:layout_margin="@dimen/chrome_margin"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/cd_settings"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            app:srcCompat="@drawable/ic_settings"
+            app:tint="@color/chrome_ghost" />
+
+        <ImageButton
+            android:id="@+id/btn_camera"
+            android:layout_width="@dimen/chrome_button"
+            android:layout_height="@dimen/chrome_button"
+            android:layout_gravity="top|end"
+            android:layout_margin="@dimen/chrome_margin"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/cd_camera"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            app:srcCompat="@drawable/ic_camera"
+            app:tint="@color/chrome_ghost" />
+
+        <TextView
+            android:id="@+id/hint"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:alpha="0.85"
+            android:gravity="center"
+            android:paddingStart="40dp"
+            android:paddingEnd="40dp"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/hint_text"
+            tools:text="@string/hint_idle" />
+
+        <TextView
+            android:id="@+id/caption"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:layout_marginBottom="84dp"
+            android:gravity="center"
+            android:text="@string/caption_bottom_edge"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/mode_pill"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="28dp"
+            android:background="@drawable/bg_pill"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:letterSpacing="0.04"
+            android:minWidth="96dp"
+            android:minHeight="40dp"
+            android:paddingStart="20dp"
+            android:paddingTop="8dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="8dp"
+            android:textColor="@color/text_primary"
+            android:textSize="@dimen/pill_text"
+            tools:text="@string/mode_winner_1" />
+    </FrameLayout>
+</FrameLayout>
