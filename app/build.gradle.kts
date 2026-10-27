@@ -18,6 +18,13 @@ android {
         versionName = "1.0.0"
         resourceConfigurations += listOf("en", "fr")
         vectorDrawables.useSupportLibrary = true
+        // CameraX ships two small native libraries per ABI; phones are ARM only.
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+    }
+
+    packaging {
+        // Kotlin builtins metadata is only read by kotlin-reflect, which the app never uses.
+        resources.excludes += setOf("kotlin/**", "META-INF/*.version")
     }
 
     // Optional release signing: reads keystore.properties at the repo root when present.
