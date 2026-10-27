@@ -78,6 +78,7 @@ class CameraSession(context: Context, private val previewView: PreviewView, timi
     private var owner: LifecycleOwner? = null
     private var bindRequested = false
     private var bound = false
+    private var front = true
     private var analyzerEnabled = true
     private var released = false
 
@@ -147,7 +148,7 @@ class CameraSession(context: Context, private val previewView: PreviewView, timi
         val lifecycleOwner = owner ?: return
         p.unbindAll()
         bound = false
-        val front = try {
+        front = try {
             p.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
         } catch (e: CameraInfoUnavailableException) {
             false
@@ -188,6 +189,15 @@ class CameraSession(context: Context, private val previewView: PreviewView, timi
     fun setAnalyzerEnabled(enabled: Boolean) {
         analyzerEnabled = enabled
         if (bound) applyAnalyzer()
+    }
+
+    /**
+     * Updates the physical device orientation (0, 90, 180, 270 degrees CCW) so the detector
+     * can find faces even when the phone is held in landscape.
+     */
+    @UiThread
+    fun setDeviceRotation(degrees: Int) {
+        faceSource.deviceRotation = degrees
     }
 
     private fun applyAnalyzer() {

@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings as SystemSettings
+import android.view.OrientationEventListener
 import android.view.View
 import android.view.WindowManager
 import android.widget.TextView
@@ -80,6 +81,8 @@ abstract class CameraHostActivity : AppCompatActivity(), FaceSource.Listener, Ca
     private val keepScreenOffRunnable = Runnable { dropKeepScreenOn() }
     private var keepScreenOn = true
 
+    private lateinit var orientationListener: OrientationEventListener
+
     /** Tracks the window flag locally: setting it again forces a relayout IPC for nothing. */
     private var keepScreenOnHeld = false
 
@@ -137,6 +140,15 @@ abstract class CameraHostActivity : AppCompatActivity(), FaceSource.Listener, Ca
         permissionOpenSettings.setOnClickListener { openAppSettings() }
         findViewById<View>(R.id.perm_use_finger).setOnClickListener { goFinger() }
 
+        orientationListener = object : OrientationEventListener(this) {
+            override fun onOrientationChanged(orientation: Int) {
+                if (orientation == OrientationEventListener.ORIENTATION_UNKNOWN) return
+                // Map the 0..359 degrees to the nearest 90-degree step.
+                val rounded = ((orientation + 45) / 90 * 90) % 360
+                session.setDeviceRotation(rounded)
+            }
+        }
+
         val fingerButton = findViewById<View>(R.id.btn_finger)
         val settingsButton = findViewById<View>(R.id.btn_settings)
         fingerButton.setOnClickListener { goFinger() }
@@ -165,6 +177,12 @@ abstract class CameraHostActivity : AppCompatActivity(), FaceSource.Listener, Ca
     override fun onStart() {
         super.onStart()
         if (!hasCameraPermission() && !permissionDenied && !permissionRequested) requestPermission()
+        orientationListener.enable()
+    }
+
+    override fun onStop() {
+        orientationListener.disable()
+        super.onStop()
     }
 
     override fun onResume() {

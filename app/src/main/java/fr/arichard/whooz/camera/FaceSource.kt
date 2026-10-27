@@ -103,6 +103,13 @@ class FaceSource(private val analysisExecutor: Executor, timings: Timings) {
     var debugEnabled: Boolean = false
 
     /**
+     * Physical device orientation (0, 90, 180, 270 degrees CCW). Used to adjust the rotation
+     * passed to ML Kit so it sees faces upright even when the phone is held in landscape.
+     */
+    @Volatile
+    var deviceRotation: Int = 0
+
+    /**
      * Current detector state, written on the UI thread. Starts READY (nothing to tell the
      * user) and only becomes READY again after a successful detection, never on mere detector
      * creation: creation succeeds while the model is still downloading, and reporting READY
@@ -341,10 +348,13 @@ class FaceSource(private val analysisExecutor: Executor, timings: Timings) {
         rotation = info.rotationDegrees
         bufferW = proxy.width
         bufferH = proxy.height
+        // Adjust the rotation so ML Kit sees the face upright relative to the physical world,
+        // rather than relative to the portrait-locked activity.
+        val effectiveRotation = (rotation + deviceRotation) % 360
         busy.set(true)
         pendingProxy.set(proxy)
         try {
-            val input = InputImage.fromMediaImage(image, rotation)
+            val input = InputImage.fromMediaImage(image, effectiveRotation)
             det.process(input).addOnCompleteListener(analysisExecutor, completeListener)
         } catch (e: Exception) {
             Log.w(TAG, "process() threw: $e")
@@ -393,6 +403,7 @@ class FaceSource(private val analysisExecutor: Executor, timings: Timings) {
         val debug = debugEnabled
         val viewW = viewWidth
         val viewH = viewHeight
+        val effectiveRotation = (rotation + deviceRotation) % 360
         observations.clear()
         backDebug.count = 0
         val n = faces.size
@@ -401,7 +412,7 @@ class FaceSource(private val analysisExecutor: Executor, timings: Timings) {
             val box = face.boundingBox
             FaceGeometry.uprightToBuffer(
                 box.left.toFloat(), box.top.toFloat(), box.right.toFloat(), box.bottom.toFloat(),
-                rotation, bufferW, bufferH, rect,
+                effectiveRotation, bufferW, bufferH, rect,
             )
             // Four corners rather than centre + one radius vector: the bounding box of the
             // mapped corners is right whatever the rotation or mirroring the matrix carries.
