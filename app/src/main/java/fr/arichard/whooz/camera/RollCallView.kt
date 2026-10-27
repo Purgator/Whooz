@@ -212,11 +212,18 @@ class RollCallView @JvmOverloads constructor(
         nowMs = now
         if (engine.phase == ChooserEngine.Phase.IDLE) {
             if (frame.confirmedCount > 0) noteActivity(now)
-            if (rollCall.update(frame.confirmedCount, frame.setVersion, now)) lockFace(now)
+            if (rollCall.update(frame.confirmedCount, frame.setVersion, loneMlId(frame), now)) lockFace(now)
             syncDerived(now)
             updateLoop(now)
             invalidate()
         }
+    }
+
+    /** The tracking id of the single confirmed face, or -1 when there is none or several. */
+    private fun loneMlId(f: FaceFrame): Int {
+        if (f.confirmedCount != 1) return -1
+        for (i in 0 until f.count) if (f.confirmed[i]) return f.mlId[i]
+        return -1
     }
 
     override fun onFrame(frameTimeMs: Long) {

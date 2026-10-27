@@ -10,10 +10,10 @@ class RollCallTest {
     private fun call() = RollCall(lockMs = 1000, collapseMs = 150, clearMs = 500, capacity = 4)
 
     /** Feeds a constant frame from [from] to [to] every 50 ms; returns the first lock time or -1. */
-    private fun hold(rc: RollCall, confirmed: Int, version: Int, from: Long, to: Long): Long {
+    private fun hold(rc: RollCall, confirmed: Int, version: Int, from: Long, to: Long, mlId: Int = version): Long {
         var t = from
         while (t <= to) {
-            if (rc.update(confirmed, version, t)) return t
+            if (rc.update(confirmed, version, if (confirmed == 1) mlId else -1, t)) return t
             t += 50
         }
         return -1L
@@ -58,6 +58,31 @@ class RollCallTest {
     }
 
     @Test
+    fun newTrackIdLocksWithoutAnEmptyFrame() {
+        val rc = call()
+        assertTrue(hold(rc, 1, 1, 0, 1000, mlId = 7) >= 0)
+        rc.enrol()
+        // The tracker handed the old slot to the newcomer (same set version), but ML Kit gave
+        // the new face a new id: timed at once, locked after lockMs, no empty frame needed.
+        val lockAt = hold(rc, 1, 1, 1050, 3000, mlId = 8)
+        assertEquals(1050L + 1000L, lockAt)
+        assertEquals(1, rc.enrol())
+        // The same id again (the same player still there) never re-locks.
+        assertEquals(-1L, hold(rc, 1, 1, 2100, 6000, mlId = 8))
+        assertEquals(RollCall.Hint.NEXT, rc.hint())
+    }
+
+    @Test
+    fun faceWithoutIdNeedsTheEmptyFrame() {
+        val rc = call()
+        assertTrue(hold(rc, 1, 1, 0, 1000, mlId = -1) >= 0)
+        rc.enrol()
+        assertEquals(-1L, hold(rc, 1, 2, 1050, 4000, mlId = -1))
+        assertEquals(-1L, hold(rc, 0, 2, 4050, 4700))
+        assertTrue(hold(rc, 1, 3, 4750, 7000, mlId = -1) >= 0)
+    }
+
+    @Test
     fun nextPlayerLocksOnlyAfterTheFrameWasEmpty() {
         val rc = call()
         assertTrue(hold(rc, 1, 1, 0, 1000) >= 0)
@@ -65,7 +90,7 @@ class RollCallTest {
         // Empty for 300 ms only, then a face: the clear window was not met, the timer does not run.
         assertEquals(-1L, hold(rc, 0, 1, 1050, 1300))
         assertTrue(rc.awaitingClear)
-        assertEquals(-1L, hold(rc, 1, 2, 1350, 1500))
+        assertEquals(-1L, hold(rc, 1, 2, 1350, 1500, mlId = 1))
         // Empty for the full clear window, then the second player holds still.
         assertEquals(-1L, hold(rc, 0, 2, 1550, 2100))
         assertFalse(rc.awaitingClear)
@@ -116,12 +141,12 @@ class RollCallTest {
     @Test
     fun arcRisesWhileHoldingAndIsZeroOtherwise() {
         val rc = call()
-        rc.update(1, 1, 0)
+        rc.update(1, 1, 5, 0)
         assertEquals(0f, rc.arc(0), 0.001f)
-        rc.update(1, 1, 500)
+        rc.update(1, 1, 5, 500)
         assertEquals(0.5f, rc.arc(500), 0.001f)
         assertTrue(rc.isAnimating(500))
-        rc.update(2, 2, 600)
+        rc.update(2, 2, -1, 600)
         // Collapsing, then zero.
         assertTrue(rc.arc(600) > 0f)
         assertEquals(0f, rc.arc(800), 0.001f)

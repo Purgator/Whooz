@@ -31,6 +31,9 @@ class FaceFrame {
     /** Ring opacity 0.4..1: fades while a confirmed face is missing during the grace window. */
     val alpha: FloatArray = FloatArray(CAPACITY)
 
+    /** ML Kit tracking id of each face, -1 when none; a new id means a new continuous track. */
+    val mlId: IntArray = IntArray(CAPACITY)
+
     /** Bumped only when the set of confirmed slots changed; drives the stability gate. */
     var setVersion: Int = 0
     var confirmedCount: Int = 0
@@ -50,6 +53,7 @@ class FaceFrame {
             radius[i] = other.radius[i]
             confirmed[i] = other.confirmed[i]
             alpha[i] = other.alpha[i]
+            mlId[i] = other.mlId[i]
         }
         count = n
         setVersion = other.setVersion

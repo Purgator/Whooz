@@ -140,6 +140,7 @@ class FaceTracker(private val timings: Timings, val capacity: Int = Palette.SIZE
             frame.radius[n] = radius[i]
             frame.confirmed[n] = state[i] == STATE_CONFIRMED
             frame.alpha[n] = alpha[i]
+            frame.mlId[n] = mlId[i]
             n++
         }
         frame.count = n

@@ -13,8 +13,11 @@ import fr.arichard.whooz.core.StabilityGate
  *
  * The lock rule: exactly one confirmed face, unchanged for [lockMs] (a [StabilityGate] with a
  * minimum count of one). Every other situation is a hint, never an action: two faces say "one
- * at a time", a freshly locked player must step aside (no confirmed face for [clearMs]) before
- * the next lock can start, so the same person is never enrolled twice by standing still.
+ * at a time", and after a lock the next timing only starts for a *new* face: a different ML Kit
+ * track id, or any lone face once the frame has been empty for [clearMs]. The same person
+ * standing still keeps the same id and is never enrolled twice; a player stepping in as the
+ * previous one steps out is a new id and is timed at once, even though the tracker keeps the
+ * old face alive for its grace period and may hand its slot to the newcomer.
  *
  * Pure and clock-injected: every rule above is unit-tested. The roster is an ordered list of
  * slots 0..n-1, the slot being the color index of the player's portrait.
@@ -50,12 +53,15 @@ class RollCall(lockMs: Long, collapseMs: Long, private val clearMs: Long, val ca
     private var emptySinceMs = -1L
     private var confirmedCount = 0
 
+    /** ML Kit id of the last locked face; -1 when it had none. */
+    private var lockedMlId = -1
+
     /**
      * Feeds one face frame. Returns true exactly when a lock fires: the caller then takes the
      * portrait of the (single) confirmed face and calls [enrol]. Nothing locks while the roster
      * is full or while the previous player has not left yet.
      */
-    fun update(confirmedCount: Int, setVersion: Int, nowMs: Long): Boolean {
+    fun update(confirmedCount: Int, setVersion: Int, loneMlId: Int, nowMs: Long): Boolean {
         this.confirmedCount = confirmedCount
         if (awaitingClear) {
             if (confirmedCount == 0) {
@@ -66,9 +72,14 @@ class RollCall(lockMs: Long, collapseMs: Long, private val clearMs: Long, val ca
                 }
             } else {
                 emptySinceMs = -1L
+                // A lone face with a new track id is the next player, whatever the tracker
+                // did with the previous one's slot.
+                if (confirmedCount == 1 && loneMlId >= 0 && loneMlId != lockedMlId) awaitingClear = false
             }
-            gate.update(0, setVersion, nowMs)
-            return false
+            if (awaitingClear) {
+                gate.update(0, setVersion, nowMs)
+                return false
+            }
         }
         val lockable = confirmedCount == 1 && count < capacity
         gate.update(if (lockable) 1 else 0, setVersion, nowMs)
@@ -76,6 +87,7 @@ class RollCall(lockMs: Long, collapseMs: Long, private val clearMs: Long, val ca
             gate.reset()
             awaitingClear = true
             emptySinceMs = -1L
+            lockedMlId = loneMlId
             return true
         }
         return false
@@ -100,6 +112,7 @@ class RollCall(lockMs: Long, collapseMs: Long, private val clearMs: Long, val ca
         awaitingClear = false
         emptySinceMs = -1L
         confirmedCount = 0
+        lockedMlId = -1
         gate.reset()
     }
 
