@@ -107,6 +107,9 @@ abstract class CameraHostActivity : AppCompatActivity(), FaceSource.Listener, Ca
     /** Whether the overlay should re-arm the analyzer when the camera binds; usually true. */
     protected open fun analyzerWantedOnBind(): Boolean = true
 
+    /** The bottom bar inset in pixels, for overlays that lay out against the chrome row. */
+    protected open fun onBottomInset(px: Int) = Unit
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         settings = Settings(this)
@@ -304,6 +307,7 @@ abstract class CameraHostActivity : AppCompatActivity(), FaceSource.Listener, Ca
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
             )
             v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            onBottomInset(bars.bottom)
             insets
         }
     }

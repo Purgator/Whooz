@@ -67,6 +67,10 @@ class RollCallActivity : CameraHostActivity(), RollCallView.Host {
         overlay.onFrameArrived(frame)
     }
 
+    override fun onBottomInset(px: Int) {
+        overlay.setBottomInset(px)
+    }
+
     private fun selectMode(mode: Mode, persist: Boolean) {
         overlay.mode = mode
         if (persist) settings.rollCallMode = mode
@@ -143,12 +147,32 @@ class RollCallActivity : CameraHostActivity(), RollCallView.Host {
             val crop = Bitmap.createBitmap(source, l, t, square, square)
             val thumb = Bitmap.createScaledBitmap(crop, sizePx, sizePx, true)
             if (crop !== thumb) crop.recycle()
+            // CameraX gives up on the pixel copy after 100 ms and hands back a transparent
+            // bitmap; a see-through portrait is worse than the colored tile.
+            if (isBlank(thumb)) {
+                thumb.recycle()
+                return null
+            }
             return thumb
         } catch (_: Exception) {
             return null
         } finally {
             source.recycle()
         }
+    }
+
+    /** True when the centre and the four quarter points are all fully transparent. */
+    private fun isBlank(bitmap: Bitmap): Boolean {
+        val w = bitmap.width
+        val h = bitmap.height
+        if (w < 4 || h < 4) return true
+        val q = intArrayOf(w / 2, h / 2, w / 4, h / 4, 3 * w / 4, h / 4, w / 4, 3 * h / 4, 3 * w / 4, 3 * h / 4)
+        var i = 0
+        while (i < q.size) {
+            if (bitmap.getPixel(q[i], q[i + 1]) ushr 24 != 0) return false
+            i += 2
+        }
+        return true
     }
 
     override fun onInteraction() {

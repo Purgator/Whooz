@@ -103,7 +103,8 @@ class RollCallView @JvmOverloads constructor(
     private val thumbMax = THUMB_MAX_DP * density
     private val thumbGap = THUMB_GAP_DP * density
     private val stripMargin = STRIP_MARGIN_DP * density
-    private val stripBottom = STRIP_BOTTOM_DP * density
+    private val stripBottomBase = STRIP_BOTTOM_DP * density
+    private var stripBottom = stripBottomBase
     private val thumbLeft = FloatArray(Palette.SIZE)
     private var thumbSize = thumbMax
     private var stripCy = 0f
@@ -166,6 +167,9 @@ class RollCallView @JvmOverloads constructor(
         engine = ChooserEngine(timings, random, abortOnLift = false)
         rollCall.retime(lockMs(timings), timings.collapseMs)
         paused = false
+        // The host may have blanked the hint meanwhile (permission card): re-emit it.
+        hint = -1
+        hintCount = -1
         val now = SystemClock.uptimeMillis()
         nowMs = now
         reset(now)
@@ -175,8 +179,8 @@ class RollCallView @JvmOverloads constructor(
 
     /** `onPause`: nothing may run or start while the screen is not shown; the roster stays. */
     fun resetAll() {
-        reset(SystemClock.uptimeMillis())
         paused = true
+        reset(SystemClock.uptimeMillis())
         clock.stop()
     }
 
@@ -453,7 +457,8 @@ class RollCallView @JvmOverloads constructor(
             hintCount = count
             h.onHintChanged(wantHint, rollCall.count)
         }
-        val wantChrome = phase == ChooserEngine.Phase.IDLE && !sleeping
+        // Chrome stays while sleeping so finger mode and settings remain one tap away.
+        val wantChrome = phase == ChooserEngine.Phase.IDLE
         if (wantChrome != chromeVisible) {
             chromeVisible = wantChrome
             h.onChromeVisible(wantChrome)
@@ -481,6 +486,15 @@ class RollCallView @JvmOverloads constructor(
     }
 
     // ---- Geometry ----------------------------------------------------------------------
+
+    /** The navigation bar inset: the strip sits above the chrome row, which sits above the bar. */
+    fun setBottomInset(px: Int) {
+        val next = stripBottomBase + px
+        if (next == stripBottom) return
+        stripBottom = next
+        layoutStrip()
+        invalidate()
+    }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
