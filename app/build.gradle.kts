@@ -14,8 +14,8 @@ android {
         applicationId = "fr.arichard.whooz"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "1.1.2"
+        versionCode = 5
+        versionName = "1.1.3"
         resourceConfigurations += listOf("en", "fr")
         vectorDrawables.useSupportLibrary = true
         // CameraX ships two small native libraries per ABI; phones are ARM only.
