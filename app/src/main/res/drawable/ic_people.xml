@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- A portrait frame with one person inside: the roll call takes one player at a time. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M5,3h14c1.1,0 2,0.9 2,2v14c0,1.1 -0.9,2 -2,2H5c-1.1,0 -2,-0.9 -2,-2V5c0,-1.1 0.9,-2 2,-2zM5,5v14h14V5H5z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,7.5c1.38,0 2.5,1.12 2.5,2.5S13.38,12.5 12,12.5 9.5,11.38 9.5,10 10.62,7.5 12,7.5zM12,13.5c2.5,0 5,1.25 5,2.8V17.5H7v-1.2c0,-1.55 2.5,-2.8 5,-2.8z" />
+</vector>

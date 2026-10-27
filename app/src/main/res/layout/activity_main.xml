@@ -47,6 +47,21 @@
             app:srcCompat="@drawable/ic_camera"
             app:tint="@color/chrome_ghost" />
 
+        <!-- Roll call: players enrolled one at a time in front of the camera. -->
+        <ImageButton
+            android:id="@+id/btn_rollcall"
+            android:layout_width="@dimen/chrome_button"
+            android:layout_height="@dimen/chrome_button"
+            android:layout_gravity="top|end"
+            android:layout_marginTop="@dimen/chrome_margin"
+            android:layout_marginEnd="64dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/cd_rollcall"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            app:srcCompat="@drawable/ic_people"
+            app:tint="@color/chrome_ghost" />
+
         <TextView
             android:id="@+id/hint"
             android:layout_width="match_parent"

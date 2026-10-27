@@ -24,6 +24,16 @@
     <string name="mlkit_downloading">Google Play services télécharge le modèle de visages…</string>
     <string name="mlkit_unavailable">Le mode caméra nécessite Google Play services — utilisez le mode doigts</string>
 
+    <!-- Roll call mode: players enrolled one at a time -->
+    <string name="rollcall_hint_first">Un joueur à la fois : approchez-vous de la caméra</string>
+    <string name="rollcall_hint_waiting">Joueur suivant, approchez-vous</string>
+    <string name="rollcall_hint_next">C\'est bon ! Laissez la place au suivant</string>
+    <string name="rollcall_hint_one_at_a_time">Un seul à la fois, s\'il vous plaît</string>
+    <string name="rollcall_hint_ready">%1$d joueurs — touchez Go, ou ajoutez-en</string>
+    <string name="rollcall_hint_full">Tout le monde est là — touchez Go</string>
+    <string name="rollcall_go">Go</string>
+    <string name="rollcall_new_group">Nouveau groupe</string>
+
     <!-- Sub-modes -->
     <string name="mode_winner_1">1 gagnant</string>
     <string name="mode_winner_2">2 gagnants</string>
@@ -35,6 +45,7 @@
     <!-- Chrome -->
     <string name="cd_camera">Mode caméra</string>
     <string name="cd_finger">Mode doigts</string>
+    <string name="cd_rollcall">Mode appel</string>
     <string name="cd_settings">Réglages</string>
     <string name="cd_back">Retour</string>
 

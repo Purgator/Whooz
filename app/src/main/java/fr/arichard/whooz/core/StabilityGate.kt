@@ -9,8 +9,11 @@ package fr.arichard.whooz.core
  * A set change does not snap the arcs to zero: the last progress animates back down over
  * [collapseMs] (the *collapse*) and the timer only restarts once the collapse is over, so
  * a quick finger shuffle reads as "start again" rather than a glitch.
+ *
+ * [minCount] is the smallest set worth timing: two for a draw, one for the roll call's lock
+ * on a single face.
  */
-class StabilityGate(private val stableMs: Long, private val collapseMs: Long) {
+class StabilityGate(private val stableMs: Long, private val collapseMs: Long, private val minCount: Int = 2) {
     private var count = 0
     private var version = 0
     private var primed = false
@@ -24,7 +27,7 @@ class StabilityGate(private val stableMs: Long, private val collapseMs: Long) {
 
     /** Feeds the current participant count and set version; idempotent between changes. */
     fun update(count: Int, setVersion: Int, nowMs: Long) {
-        val changed = primed && (setVersion != this.version || (count >= 2) != (this.count >= 2))
+        val changed = primed && (setVersion != this.version || (count >= minCount) != (this.count >= minCount))
         if (changed) {
             val from = arc(nowMs)
             if (from > 0f) {
@@ -36,21 +39,21 @@ class StabilityGate(private val stableMs: Long, private val collapseMs: Long) {
         this.count = count
         this.version = setVersion
         primed = true
-        if (count >= 2 && progressStartMs < 0L) {
+        if (count >= minCount && progressStartMs < 0L) {
             // Restart after the collapse so the arc never grows while it is still shrinking.
             progressStartMs = if (isCollapsing(nowMs)) collapseStartMs + collapseMs else nowMs
         }
     }
 
-    /** Arming progress 0..1; rises only while two or more participants hold still. */
+    /** Arming progress 0..1; rises only while at least [minCount] participants hold still. */
     fun progress(nowMs: Long): Float {
-        if (count < 2 || progressStartMs < 0L || nowMs < progressStartMs) return 0f
+        if (count < minCount || progressStartMs < 0L || nowMs < progressStartMs) return 0f
         return Easing.progress(nowMs - progressStartMs, stableMs)
     }
 
-    /** True once [stableMs] elapsed with an unchanged set of at least two participants. */
+    /** True once [stableMs] elapsed with an unchanged set of at least [minCount] participants. */
     fun armed(nowMs: Long): Boolean =
-        count >= 2 && progressStartMs >= 0L && nowMs - progressStartMs >= stableMs
+        count >= minCount && progressStartMs >= 0L && nowMs - progressStartMs >= stableMs
 
     /** The arc shrinking back from the last progress to 0 over [collapseMs]; 0 when idle. */
     fun collapseProgress(nowMs: Long): Float {
@@ -67,7 +70,7 @@ class StabilityGate(private val stableMs: Long, private val collapseMs: Long) {
 
     /** True while a frame loop is needed: the arc is collapsing or still rising. */
     fun isAnimating(nowMs: Long): Boolean =
-        isCollapsing(nowMs) || (count >= 2 && progressStartMs >= 0L && !armed(nowMs))
+        isCollapsing(nowMs) || (count >= minCount && progressStartMs >= 0L && !armed(nowMs))
 
     /** Forgets everything; the next [update] starts from zero without a collapse. */
     fun reset() {

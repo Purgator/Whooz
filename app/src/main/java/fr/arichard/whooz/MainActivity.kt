@@ -63,7 +63,7 @@ class MainActivity : AppCompatActivity(), FingerChooserView.Listener {
     private var mode: Mode = Mode.DEFAULT
     private var roundsCompleted = 0
 
-    /** True when onCreate handed over to CameraActivity: nothing below was initialised. */
+    /** True when onCreate handed over to a camera screen: nothing below was initialised. */
     private var redirected = false
 
     private val backCallback = object : OnBackPressedCallback(false) {
@@ -77,11 +77,13 @@ class MainActivity : AppCompatActivity(), FingerChooserView.Listener {
         settings = Settings(this)
         hasCamera = packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)
 
-        // Mode memory: a camera-only group opens straight into the camera, zero friction.
+        // Mode memory: a camera-only group opens straight into its camera screen, zero friction.
+        val lastMode = settings.lastMode
         if (savedInstanceState == null && hasCamera && settings.rememberLastMode &&
-            settings.lastMode == Settings.ScreenMode.CAMERA
+            lastMode != Settings.ScreenMode.FINGER
         ) {
             redirected = true
+            val target = if (lastMode == Settings.ScreenMode.ROLLCALL) RollCallActivity::class.java else CameraActivity::class.java
             // This activity is singleTask and finishes right away, so the task's root record
             // is gone while CameraActivity lives on. A later launcher tap finds the task but
             // no MainActivity to deliver to and creates a fresh one ON TOP of that camera
@@ -89,7 +91,7 @@ class MainActivity : AppCompatActivity(), FingerChooserView.Listener {
             // (and a third on the next tap). CLEAR_TOP | SINGLE_TOP instead collapses the
             // task onto the existing CameraActivity, which gets onNewIntent and resumes.
             startActivity(
-                Intent(this, CameraActivity::class.java)
+                Intent(this, target)
                     .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             )
             // Camera-only groups never show this screen, so the daily update check would
@@ -111,6 +113,7 @@ class MainActivity : AppCompatActivity(), FingerChooserView.Listener {
         val chromeLayer = findViewById<FrameLayout>(R.id.chrome_layer)
         val btnSettings = findViewById<ImageButton>(R.id.btn_settings)
         val btnCamera = findViewById<ImageButton>(R.id.btn_camera)
+        val btnRollCall = findViewById<ImageButton>(R.id.btn_rollcall)
 
         applyInsetsAsPadding(chromeLayer)
 
@@ -120,8 +123,13 @@ class MainActivity : AppCompatActivity(), FingerChooserView.Listener {
                 settings.lastMode = Settings.ScreenMode.CAMERA
                 startActivity(Intent(this, CameraActivity::class.java))
             }
+            btnRollCall.setOnClickListener {
+                settings.lastMode = Settings.ScreenMode.ROLLCALL
+                startActivity(Intent(this, RollCallActivity::class.java))
+            }
         } else {
             btnCamera.visibility = View.GONE
+            btnRollCall.visibility = View.GONE
         }
         pill.setOnClickListener { cycleMode() }
         pill.setOnLongClickListener {
@@ -129,7 +137,7 @@ class MainActivity : AppCompatActivity(), FingerChooserView.Listener {
             true
         }
 
-        chrome = Chrome(listOf(btnSettings, btnCamera, pill))
+        chrome = Chrome(listOf(btnSettings, btnCamera, btnRollCall, pill))
         banner = UpdateBanner(this, chromeLayer)
         arena.listener = this
         onBackPressedDispatcher.addCallback(this, backCallback)

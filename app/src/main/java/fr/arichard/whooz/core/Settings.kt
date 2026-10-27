@@ -8,7 +8,7 @@ class Settings(context: Context) {
     private val prefs: SharedPreferences =
         context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
 
-    enum class ScreenMode { FINGER, CAMERA }
+    enum class ScreenMode { FINGER, CAMERA, ROLLCALL }
 
     var stabilization: StabilizationPreset
         get() = StabilizationPreset.fromName(prefs.getString(KEY_STABILIZATION, null))
@@ -27,7 +27,11 @@ class Settings(context: Context) {
         set(value) = prefs.edit().putBoolean(KEY_REMEMBER_MODE, value).apply()
 
     var lastMode: ScreenMode
-        get() = if (prefs.getString(KEY_LAST_MODE, null) == ScreenMode.CAMERA.name) ScreenMode.CAMERA else ScreenMode.FINGER
+        get() = when (prefs.getString(KEY_LAST_MODE, null)) {
+            ScreenMode.CAMERA.name -> ScreenMode.CAMERA
+            ScreenMode.ROLLCALL.name -> ScreenMode.ROLLCALL
+            else -> ScreenMode.FINGER
+        }
         set(value) = prefs.edit().putString(KEY_LAST_MODE, value.name).apply()
 
     var fingerMode: Mode
@@ -37,6 +41,10 @@ class Settings(context: Context) {
     var cameraMode: Mode
         get() = Mode.parse(prefs.getString(KEY_CAMERA_MODE, null)).let { if (it in Mode.CAMERA_MODES) it else Mode.DEFAULT }
         set(value) = prefs.edit().putString(KEY_CAMERA_MODE, value.serialize()).apply()
+
+    var rollCallMode: Mode
+        get() = Mode.parse(prefs.getString(KEY_ROLLCALL_MODE, null)).let { if (it in Mode.CAMERA_MODES) it else Mode.DEFAULT }
+        set(value) = prefs.edit().putString(KEY_ROLLCALL_MODE, value.serialize()).apply()
 
     var firstLaunchHintShown: Boolean
         get() = prefs.getBoolean(KEY_FIRST_HINT, false)
@@ -86,6 +94,7 @@ class Settings(context: Context) {
         private const val KEY_LAST_MODE = "last_mode"
         private const val KEY_FINGER_MODE = "finger_mode"
         private const val KEY_CAMERA_MODE = "camera_mode"
+        private const val KEY_ROLLCALL_MODE = "rollcall_mode"
         private const val KEY_FIRST_HINT = "first_hint_shown"
         private const val KEY_ROUNDS = "completed_rounds"
         private const val KEY_AUTO_UPDATE = "auto_update"

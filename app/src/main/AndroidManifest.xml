@@ -62,6 +62,12 @@
             tools:ignore="DiscouragedApi" />
 
         <activity
+            android:name=".RollCallActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            tools:ignore="DiscouragedApi" />
+
+        <activity
             android:name=".SettingsActivity"
             android:exported="false"
             android:label="@string/settings_title" />
