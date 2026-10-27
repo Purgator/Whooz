@@ -15,6 +15,12 @@ own updates, and nothing is recorded. Inspired by [Chwazi](https://chwazi.com/).
   colored ring around it. Hold still, and the same countdown eliminates the rings until one
   player is left. Nothing leaves the phone: frames are analyzed on the device and dropped.
   (Needs Google Play services for the face model.)
+- 🪪 **Roll call** — for big groups or a small room: players come in front of the camera
+  one at a time. Each face is locked after a second and photographed into a portrait tile
+  at the bottom of the screen; step aside, next player. When everyone is in, tap **Go** and
+  the draw runs over the portraits: they pulse, the losers vanish one by one, and the
+  winner's portrait fills the screen in their color. Tap a portrait to remove it, *New
+  group* to start over. Portraits live in memory only and are gone when you leave.
 
 Both modes offer more than "pick one" from the pill at the bottom of the screen:
 
@@ -144,7 +150,9 @@ build) that draws the raw face boxes over the preview.
 | `core/StabilityGate.kt` | "Hold still" progress with a collapse animation on every change |
 | `core/ChooserEngine.kt` | IDLE → COUNTDOWN → ELIMINATING → RESULT → FADING; draws the outcome once |
 | `core/Mode.kt`, `Timings.kt`, `Palette.kt`, `Easing.kt` | Sub-modes, durations, colors, animation math |
-| `CameraActivity.kt` | Camera host: permission flow, ML Kit availability banner, chrome |
+| `CameraHostActivity.kt` | Shared camera host: permission flow, session, ML Kit banner, immersive window, sleep |
+| `CameraActivity.kt` | Group camera mode: the face overlay, the Pick 1/2 pill |
+| `RollCallActivity.kt`, `camera/RollCallView.kt`, `camera/RollCall.kt` | Roll call: one-at-a-time lock (pure, tested), portrait capture from the preview, the draw over the portraits |
 | `camera/CameraSession.kt` | CameraX: front camera, Preview + ImageAnalysis, 15 Hz throttle, view matrix |
 | `camera/FaceSource.kt` | ML Kit detector lifecycle/retry; faces → view coordinates → tracker |
 | `camera/FaceTracker.kt`, `FaceGeometry.kt` | Pure tracking (id rescue, 3-hit confirm, grace) and rotation math |
@@ -180,6 +188,11 @@ build) that draws the raw face boxes over the preview.
    when it blinks out, and survives ML Kit changing its id if it reappears close by. The
    same gate and engine then run on the confirmed faces; during the elimination the analyzer
    is switched off so rings stay where they were and nobody can dodge.
+   The roll call reuses the same session and tracker with a one-face rule: exactly one
+   confirmed face held still locks, the preview is copied once around the ring into a
+   portrait, and the frame must be empty for a moment before the next player can be timed,
+   so nobody is enrolled twice by standing still. The draw then runs on portraits instead
+   of live faces, which also makes it immune to detection range.
 3. **Updates.** Once a day while the app is open, it reads the latest GitHub release,
    downloads `Whooz.apk` over Wi-Fi, checks that the APK is signed with the same key, and
    offers it in a banner. The install goes through a `PackageInstaller` session, so on recent

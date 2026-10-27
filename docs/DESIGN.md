@@ -292,3 +292,30 @@ app_name "Whooz"; hint_idle "Everyone, put one finger on the screen"; hint_idle_
 - Self-update: the daily check runs even when a cached APK exists; download failures are deferred, not throttled; an APK rejected by the signer/versionCode check is remembered and never re-downloaded; a forced "Check now" clears a "Later" dismissal; installer error toasts are fully localized.
 - `ChooserEngine.needsFrames()` is false in RESULT for Order/Teams (nothing floods).
 - Packaging: no EmojiCompat initializer, ARM ABIs only, no Kotlin builtins metadata (release APK ≈ 1.1 MB).
+
+## 17. Roll call mode (v1.1.0)
+
+Why: the group camera mode needs every face in the frame at once, which pushes players away
+from a selfie camera and past the detector's practical range (about 100 px per face at
+640×480). The roll call brings each player close, alone, for a second.
+
+- `RollCallActivity` (third screen, `Settings.ScreenMode.ROLLCALL`, reachable from both other
+  screens and remembered like camera mode) extends the new `CameraHostActivity`, which now
+  holds everything `CameraActivity` and the roll call share (permission flow, session, ML Kit
+  banner, immersive window, keep-screen-on, sleep/wake, insets).
+- `RollCall` (pure, tested): a `StabilityGate` with `minCount = 1` times a *lone* confirmed
+  face for the finger preset's delay (camera delay minus 300 ms, at least 800 ms). The lock
+  fires once; then `awaitingClear` holds until the frame has had no confirmed face for 600 ms,
+  so the same player standing still is never enrolled twice. Two faces → "one at a time",
+  no timing. Roster = slots 0..n-1 (slot = color), tap a portrait to remove, "New group"
+  clears, capacity 16.
+- Portrait: on lock the activity calls `PreviewView.getBitmap()` (view coordinates, mirrored
+  and cropped like the screen), cuts a square of 1.25 × the ring radius around the ring,
+  scales it to 256 px. Null bitmap → a colored tile with the number; the draw is the same.
+- Draw: `ChooserEngine` (abortOnLift false) over participants 0..n-1 on the Go button; the
+  analyzer is off for the whole round. `RollCallView` animates the strip (countdown pulse
+  and dimming, eliminations shrinking), then the winner's portrait grows from its tile to
+  the upper centre in a flood of its color with a bottom band; Pick 2 splits the screen in
+  columns. Tap after the hold re-arms with the same roster (FADING back to the strip).
+- Detection range of the group mode: `MIN_FACE_SIZE` lowered from 0.15 to 0.1.
+- Strings: `rollcall_hint_*`, `rollcall_go`, `rollcall_new_group`, `cd_rollcall` (EN + FR).
