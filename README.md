@@ -58,6 +58,10 @@ versions with release notes: [Releases page](https://github.com/Purgator/Whooz/r
 - The status bar is hidden while you play; swipe from the top to peek at it.
 - Camera mode needs **Google Play services** (it downloads the face model the first time,
   which can take a few seconds). Phones without it only have finger mode.
+- After a camera round, Google's ML Kit client may flush a small usage-statistics batch to
+  Google through a scheduled job once the app is closed. That is the only thing that can
+  ever run while Whooz is off screen; it comes from the face detector itself and has no
+  switch in its public API. Finger mode never triggers it.
 
 ## Development setup
 
