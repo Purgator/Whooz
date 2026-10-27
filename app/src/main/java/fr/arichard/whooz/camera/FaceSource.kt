@@ -520,6 +520,11 @@ class FaceSource(private val analysisExecutor: Executor, timings: Timings) {
         const val MAX_ATTEMPTS = 12
 
         /** Faces smaller than 15 % of the frame are ignored: too far to be a player anyway. */
-        const val MIN_FACE_SIZE = 0.15f
+        /**
+         * Smallest face ML Kit looks for, as a fraction of the image width. The detector's
+         * practical floor in FAST mode is about 100 px, 0.1 of a 640 px frame lets it find
+         * players a step further back than 0.15 did, at a small cost per frame.
+         */
+        const val MIN_FACE_SIZE = 0.1f
     }
 }
