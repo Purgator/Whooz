@@ -78,7 +78,7 @@
     <string name="update_later">Later</string>
     <string name="update_checking">Checking…</string>
     <string name="update_up_to_date">You are up to date</string>
-    <string name="update_downloaded">Update downloaded — go back to install</string>
+    <string name="update_installing">Update downloaded — installing…</string>
     <string name="update_no_network">No connection</string>
     <string name="update_wifi_pending">Update will download on Wi-Fi</string>
     <string name="update_download_failed">Download interrupted — it will retry on Wi-Fi</string>

@@ -16,7 +16,10 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import fr.arichard.whooz.core.Settings
 import fr.arichard.whooz.core.StabilizationPreset
+import fr.arichard.whooz.update.ApkInstaller
 import fr.arichard.whooz.update.UpdateManager
+import android.provider.Settings as SystemSettings
+import android.util.Log
 
 /**
  * Hand-built settings screen: a ScrollView of rows wired to [Settings] directly, because the
@@ -37,6 +40,17 @@ class SettingsActivity : AppCompatActivity() {
     // Guards against stacking network threads when the row is tapped repeatedly.
     @Volatile
     private var checking = false
+
+    /** Install bounced to the unknown-sources screen: retried when the user comes back. */
+    private var pendingInstall = false
+
+    override fun onResume() {
+        super.onResume()
+        if (pendingInstall) {
+            pendingInstall = false
+            if (packageManager.canRequestPackageInstalls()) installReadyUpdate()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -151,6 +165,8 @@ class SettingsActivity : AppCompatActivity() {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 status.visibility = View.GONE
                 Toast.makeText(this, toastFor(result.status), Toast.LENGTH_LONG).show()
+                // The user asked for the update now: no banner to find later, install it here.
+                if (result.status == UpdateManager.Status.UPDATE_READY) installReadyUpdate()
             }
         }
         thread.isDaemon = true
@@ -158,9 +174,37 @@ class SettingsActivity : AppCompatActivity() {
         thread.start()
     }
 
+    /**
+     * Installs the downloaded APK through the installer session, after the one detour Android
+     * may impose (allowing this app to install unknown apps); the retry happens in `onResume`.
+     * The file lookup and the session copy run off the UI thread.
+     */
+    private fun installReadyUpdate() {
+        if (!packageManager.canRequestPackageInstalls()) {
+            pendingInstall = true
+            try {
+                startActivity(
+                    Intent(SystemSettings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName")),
+                )
+            } catch (e: Exception) {
+                Log.w(UpdateManager.TAG, "Could not open the unknown-sources setting", e)
+                pendingInstall = false
+            }
+            return
+        }
+        val appContext = applicationContext
+        val thread = Thread {
+            val ready = UpdateManager.readyUpdate(appContext)
+            if (ready != null) ApkInstaller.install(appContext, ready.file)
+        }
+        thread.isDaemon = true
+        thread.name = "whooz-install"
+        thread.start()
+    }
+
     private fun toastFor(status: UpdateManager.Status): Int = when (status) {
         UpdateManager.Status.UP_TO_DATE -> R.string.update_up_to_date
-        UpdateManager.Status.UPDATE_READY -> R.string.update_downloaded
+        UpdateManager.Status.UPDATE_READY -> R.string.update_installing
         UpdateManager.Status.UPDATE_DEFERRED -> R.string.update_wifi_pending
         UpdateManager.Status.DOWNLOAD_FAILED -> R.string.update_download_failed
         UpdateManager.Status.NO_NETWORK -> R.string.update_no_network

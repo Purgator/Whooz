@@ -78,7 +78,7 @@
     <string name="update_later">Plus tard</string>
     <string name="update_checking">Vérification…</string>
     <string name="update_up_to_date">Vous êtes à jour</string>
-    <string name="update_downloaded">Mise à jour téléchargée — revenez en arrière pour l\'installer</string>
+    <string name="update_installing">Mise à jour téléchargée — installation…</string>
     <string name="update_no_network">Pas de connexion</string>
     <string name="update_wifi_pending">La mise à jour se téléchargera en Wi-Fi</string>
     <string name="update_download_failed">Téléchargement interrompu — nouvel essai en Wi-Fi</string>
