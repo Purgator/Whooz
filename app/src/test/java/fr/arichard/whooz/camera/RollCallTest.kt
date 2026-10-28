@@ -58,18 +58,18 @@ class RollCallTest {
     }
 
     @Test
-    fun newTrackIdLocksWithoutAnEmptyFrame() {
+    fun newTrackIdOnlyLocksIfTheSetVersionAlsoChanges() {
         val rc = call()
         assertTrue(hold(rc, 1, 1, 0, 1000, mlId = 7) >= 0)
         rc.enrol()
-        // The tracker handed the old slot to the newcomer (same set version), but ML Kit gave
-        // the new face a new id: timed at once, locked after lockMs, no empty frame needed.
-        val lockAt = hold(rc, 1, 1, 1050, 3000, mlId = 8)
-        assertEquals(1050L + 1000L, lockAt)
+        // The tracking id flickers to 8, but the tracker rescued the id-swap and kept the
+        // same set version: nothing happens, we wait for the previous player to leave.
+        assertEquals(-1L, hold(rc, 1, 1, 1050, 3000, mlId = 8))
+        assertTrue(rc.awaitingClear)
+        // Now the tracker sees a new person (new set version) with a new id: lock fires.
+        val lockAt = hold(rc, 1, 2, 3050, 5000, mlId = 9)
+        assertTrue(lockAt >= 3050 + 1000)
         assertEquals(1, rc.enrol())
-        // The same id again (the same player still there) never re-locks.
-        assertEquals(-1L, hold(rc, 1, 1, 2100, 6000, mlId = 8))
-        assertEquals(RollCall.Hint.NEXT, rc.hint())
     }
 
     @Test

@@ -49,7 +49,7 @@ class RollCall(lockMs: Long, collapseMs: Long, private val clearMs: Long, val ca
     /** True after a lock until the frame has been empty for [clearMs]. */
     var awaitingClear: Boolean = false
         private set
-
+    private var lockedVersion = -1
     private var emptySinceMs = -1L
     private var confirmedCount = 0
 
@@ -72,9 +72,10 @@ class RollCall(lockMs: Long, collapseMs: Long, private val clearMs: Long, val ca
                 }
             } else {
                 emptySinceMs = -1L
-                // A lone face with a new track id is the next player, whatever the tracker
-                // did with the previous one's slot.
-                if (confirmedCount == 1 && loneMlId >= 0 && loneMlId != lockedMlId) awaitingClear = false
+                // A lone face with a new track id is the next player, provided the tracker
+                // also saw the set change (new version): if it's the same version, it's just
+                // a tracking id swap for the same person.
+                if (confirmedCount == 1 && loneMlId >= 0 && loneMlId != lockedMlId && setVersion != lockedVersion) awaitingClear = false
             }
             if (awaitingClear) {
                 gate.update(0, setVersion, nowMs)
@@ -88,6 +89,7 @@ class RollCall(lockMs: Long, collapseMs: Long, private val clearMs: Long, val ca
             awaitingClear = true
             emptySinceMs = -1L
             lockedMlId = loneMlId
+            lockedVersion = setVersion
             return true
         }
         return false
@@ -113,6 +115,7 @@ class RollCall(lockMs: Long, collapseMs: Long, private val clearMs: Long, val ca
         emptySinceMs = -1L
         confirmedCount = 0
         lockedMlId = -1
+        lockedVersion = -1
         gate.reset()
     }
 
