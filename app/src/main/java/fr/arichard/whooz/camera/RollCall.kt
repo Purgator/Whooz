@@ -61,7 +61,13 @@ class RollCall(lockMs: Long, collapseMs: Long, private val clearMs: Long, val ca
      * portrait of the (single) confirmed face and calls [enrol]. Nothing locks while the roster
      * is full or while the previous player has not left yet.
      */
-    fun update(confirmedCount: Int, setVersion: Int, loneMlId: Int, nowMs: Long): Boolean {
+    fun update(
+        confirmedCount: Int,
+        setVersion: Int,
+        loneMlId: Int,
+        nowMs: Long,
+        autoLock: Boolean = true,
+    ): Boolean {
         this.confirmedCount = confirmedCount
         if (awaitingClear) {
             if (confirmedCount == 0) {
@@ -84,7 +90,7 @@ class RollCall(lockMs: Long, collapseMs: Long, private val clearMs: Long, val ca
         }
         val lockable = confirmedCount == 1 && count < capacity
         gate.update(if (lockable) 1 else 0, setVersion, nowMs)
-        if (lockable && gate.armed(nowMs)) {
+        if (lockable && autoLock && gate.armed(nowMs)) {
             gate.reset()
             awaitingClear = true
             emptySinceMs = -1L
@@ -93,6 +99,18 @@ class RollCall(lockMs: Long, collapseMs: Long, private val clearMs: Long, val ca
             return true
         }
         return false
+    }
+
+    /** Captures the current lone face immediately when automatic capture is disabled. */
+    fun forceLock(confirmedCount: Int, setVersion: Int, loneMlId: Int): Boolean {
+        if (confirmedCount != 1 || count >= capacity || awaitingClear) return false
+        this.confirmedCount = confirmedCount
+        awaitingClear = true
+        emptySinceMs = -1L
+        lockedMlId = loneMlId
+        lockedVersion = setVersion
+        gate.reset()
+        return true
     }
 
     /** Adds the player whose portrait was just taken; returns its slot, or -1 when full. */

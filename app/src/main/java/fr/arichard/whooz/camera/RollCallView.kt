@@ -48,6 +48,10 @@ class RollCallView @JvmOverloads constructor(
         fun onAnalyzerEnabled(enabled: Boolean)
         /** The roster changed: Go needs at least two, "new group" needs at least one. */
         fun onRosterChanged(count: Int, canDraw: Boolean)
+        /** A portrait was selected; the host exposes the deliberate remove action. */
+        fun onPortraitSelected(index: Int)
+        /** A lone confirmed face can be captured with the explicit photo action. */
+        fun onCaptureAvailable(available: Boolean)
         /**
          * Takes the portrait of the face just locked, a square of [sizePx] around the ring
          * (view coordinates). Null when the preview has no pixels yet: the player is enrolled
@@ -63,6 +67,9 @@ class RollCallView @JvmOverloads constructor(
 
     /** Sub-mode used by the next draw; the pill writes it. */
     var mode: Mode = Mode.DEFAULT
+
+    /** When false, portraits are only captured through the explicit action. */
+    private var autoCapture = true
 
     private val density = resources.displayMetrics.density
     private val random = Random(SecureRandom().nextLong())
@@ -98,6 +105,8 @@ class RollCallView @JvmOverloads constructor(
     private var hintCount = -1
     private var chromeVisible = true
     private var analyzerWanted = true
+    private var selectedPortrait = -1
+    private var captureAvailable = false
 
     // Strip geometry, rebuilt by layoutStrip (never in onDraw).
     private val thumbMax = THUMB_MAX_DP * density
@@ -134,6 +143,7 @@ class RollCallView @JvmOverloads constructor(
         color = Color.WHITE
     }
     private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = borderStroke }
+    private val selectionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 3f * density; color = Color.WHITE }
     private val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -160,10 +170,11 @@ class RollCallView @JvmOverloads constructor(
      * are immutable) and whatever the old one was doing is dropped; the roster is kept, a trip
      * to Settings must not cost the group its portraits.
      */
-    fun configure(timings: Timings, haptics: Haptics, mode: Mode) {
+    fun configure(timings: Timings, haptics: Haptics, mode: Mode, autoCapture: Boolean) {
         this.timings = timings
         this.haptics = haptics
         this.mode = mode
+        this.autoCapture = autoCapture
         engine = ChooserEngine(timings, random, abortOnLift = false)
         rollCall.retime(lockMs(timings), timings.collapseMs)
         paused = false
@@ -212,7 +223,7 @@ class RollCallView @JvmOverloads constructor(
         nowMs = now
         if (engine.phase == ChooserEngine.Phase.IDLE) {
             if (frame.confirmedCount > 0) noteActivity(now)
-            if (rollCall.update(frame.confirmedCount, frame.setVersion, loneMlId(frame), now)) lockFace(now)
+            if (rollCall.update(frame.confirmedCount, frame.setVersion, loneMlId(frame), now, autoCapture)) lockFace(now)
             syncDerived(now)
             updateLoop(now)
             invalidate()
@@ -254,6 +265,18 @@ class RollCallView @JvmOverloads constructor(
         host?.onRosterChanged(rollCall.count, rollCall.canDraw())
     }
 
+    /** Captures the currently confirmed lone face without waiting for the stability timer. */
+    fun captureNow() {
+        if (paused || sleeping || engine.phase != ChooserEngine.Phase.IDLE) return
+        val now = SystemClock.uptimeMillis()
+        nowMs = now
+        if (!rollCall.forceLock(frame.confirmedCount, frame.setVersion, loneMlId(frame))) return
+        lockFace(now)
+        syncDerived(now)
+        updateLoop(now)
+        invalidate()
+    }
+
     // ---- Round -------------------------------------------------------------------------
 
     /** The Go button: draws among the enrolled portraits. */
@@ -262,6 +285,8 @@ class RollCallView @JvmOverloads constructor(
         val now = SystemClock.uptimeMillis()
         nowMs = now
         val n = rollCall.count
+        selectedPortrait = -1
+        host?.onPortraitSelected(-1)
         for (i in 0 until n) participants[i] = i
         if (!engine.start(participants, n, mode, now)) return
         host?.onInteraction()
@@ -280,6 +305,7 @@ class RollCallView @JvmOverloads constructor(
     fun newGroup() {
         if (paused || engine.phase != ChooserEngine.Phase.IDLE) return
         rollCall.clear()
+        selectedPortrait = -1
         for (i in portraits.indices) {
             portraits[i]?.recycle()
             portraits[i] = null
@@ -287,6 +313,42 @@ class RollCallView @JvmOverloads constructor(
         haptics.tick(this)
         layoutStrip()
         host?.onRosterChanged(0, false)
+        host?.onPortraitSelected(-1)
+        syncDerived(SystemClock.uptimeMillis())
+        invalidate()
+    }
+
+    /** Returns the current roster for persistence; only called by the activity outside draw paths. */
+    fun currentPortraits(): List<Bitmap> {
+        val result = ArrayList<Bitmap>(rollCall.count)
+        for (i in 0 until rollCall.count) portraits[i]?.let(result::add)
+        return result
+    }
+
+    /** Replaces the current roster with decoded portraits from a recent group. */
+    fun restoreGroup(bitmaps: List<Bitmap>) {
+        if (paused || sleeping || engine.phase != ChooserEngine.Phase.IDLE) {
+            for (bitmap in bitmaps) bitmap.recycle()
+            return
+        }
+        rollCall.clear()
+        for (i in portraits.indices) {
+            portraits[i]?.recycle()
+            portraits[i] = null
+        }
+        for (bitmap in bitmaps) {
+            val slot = rollCall.enrol()
+            if (slot < 0) {
+                bitmap.recycle()
+            } else {
+                portraits[slot] = bitmap
+            }
+        }
+        selectedPortrait = -1
+        frame.clear()
+        layoutStrip()
+        host?.onPortraitSelected(-1)
+        host?.onRosterChanged(rollCall.count, rollCall.canDraw())
         syncDerived(SystemClock.uptimeMillis())
         invalidate()
     }
@@ -363,7 +425,15 @@ class RollCallView @JvmOverloads constructor(
         when (engine.phase) {
             ChooserEngine.Phase.IDLE -> {
                 val k = thumbAt(x, y)
-                if (k >= 0) removePlayer(k)
+                if (k >= 0) {
+                    selectedPortrait = if (selectedPortrait == k) -1 else k
+                    host?.onPortraitSelected(selectedPortrait)
+                    invalidate()
+                } else if (selectedPortrait >= 0) {
+                    selectedPortrait = -1
+                    host?.onPortraitSelected(-1)
+                    invalidate()
+                }
             }
             ChooserEngine.Phase.RESULT -> if (engine.requestRearm(true, now)) {
                 removeCallbacks(sleepRunnable)
@@ -383,15 +453,20 @@ class RollCallView @JvmOverloads constructor(
         return -1
     }
 
-    private fun removePlayer(index: Int) {
+    fun removeSelected() {
+        if (paused || sleeping || engine.phase != ChooserEngine.Phase.IDLE) return
+        val index = selectedPortrait
+        if (index < 0) return
         val n = rollCall.count
         if (!rollCall.remove(index)) return
         portraits[index]?.recycle()
         for (k in index until n - 1) portraits[k] = portraits[k + 1]
         portraits[n - 1] = null
+        selectedPortrait = -1
         haptics.tick(this)
         layoutStrip()
         host?.onRosterChanged(rollCall.count, rollCall.canDraw())
+        host?.onPortraitSelected(-1)
         syncDerived(nowMs)
         invalidate()
     }
@@ -463,6 +538,12 @@ class RollCallView @JvmOverloads constructor(
             hint = wantHint
             hintCount = count
             h.onHintChanged(wantHint, rollCall.count)
+        }
+        val wantCapture = phase == ChooserEngine.Phase.IDLE && !sleeping && frame.confirmedCount == 1 &&
+            !rollCall.awaitingClear && !rollCall.isFull()
+        if (wantCapture != captureAvailable) {
+            captureAvailable = wantCapture
+            h.onCaptureAvailable(wantCapture)
         }
         // Chrome stays while sleeping so finger mode and settings remain one tap away.
         val wantChrome = phase == ChooserEngine.Phase.IDLE
@@ -697,6 +778,13 @@ class RollCallView @JvmOverloads constructor(
         borderPaint.color = Palette.withAlpha(color, alpha)
         borderPaint.strokeWidth = borderStroke * (size / thumbMax).coerceIn(0.5f, 2f)
         canvas.drawRoundRect(rect, radius, radius, borderPaint)
+        if (slot == selectedPortrait && engine.phase == ChooserEngine.Phase.IDLE) {
+            selectionPaint.alpha = (alpha * 255f + 0.5f).toInt()
+            val inset = selectionPaint.strokeWidth * 0.75f
+            rect.inset(-inset, -inset)
+            canvas.drawRoundRect(rect, radius + inset, radius + inset, selectionPaint)
+            rect.inset(inset, inset)
+        }
         // Number badge on the bottom-right corner, small enough to leave the face visible.
         val br = badgeRadius * (size / thumbMax).coerceIn(0.6f, 2f)
         val bx = rect.right - br * 0.4f

@@ -33,6 +33,12 @@
     <string name="rollcall_hint_full">Everyone is in — tap Go</string>
     <string name="rollcall_go">Go</string>
     <string name="rollcall_new_group">New group</string>
+    <string name="rollcall_recent_groups">Recent groups</string>
+    <string name="rollcall_remove_player">Remove selected</string>
+    <string name="rollcall_capture">Capture</string>
+    <string name="rollcall_no_recent_groups">No saved groups yet</string>
+    <string name="rollcall_recent_group_title">Recent groups</string>
+    <string name="rollcall_recent_group_item">Group with %1$d players</string>
 
     <!-- Sub-modes -->
     <string name="mode_winner_1">Pick 1</string>
@@ -58,6 +64,8 @@
     <string name="settings_delay_slow">Slow</string>
     <string name="settings_haptics">Haptics</string>
     <string name="settings_haptics_summary">Vibrate on each tick and on the reveal</string>
+    <string name="settings_auto_capture">Auto-capture portraits</string>
+    <string name="settings_auto_capture_summary">Capture after the hold delay, or use Capture manually</string>
     <string name="settings_keep_screen_on">Keep screen on</string>
     <string name="settings_keep_screen_on_summary">While a round is on the screen</string>
     <string name="settings_remember_mode">Remember last mode</string>

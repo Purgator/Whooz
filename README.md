@@ -2,8 +2,8 @@
 
 **Who plays first?** Whooz is a tiny Android app that answers that one question. Everyone
 puts a finger on the screen, or everyone looks at the selfie camera, and after a short
-suspense only one player's color remains. No accounts, no ads, no network except for its
-own updates, and nothing is recorded. Inspired by [Chwazi](https://chwazi.com/).
+suspense only one player's color remains. No accounts, no ads, and no network except for its
+own updates; camera data stays on the phone. Inspired by [Chwazi](https://chwazi.com/).
 
 ## Two ways to decide
 
@@ -19,8 +19,9 @@ own updates, and nothing is recorded. Inspired by [Chwazi](https://chwazi.com/).
   one at a time. Each face is locked after a second and photographed into a portrait tile
   at the bottom of the screen; step aside, next player. When everyone is in, tap **Go** and
   the draw runs over the portraits: they pulse, the losers vanish one by one, and the
-  winner's portrait fills the screen in their color. Tap a portrait to remove it, *New
-  group* to start over. Portraits live in memory only and are gone when you leave.
+  winner's portrait fills the screen in their color. Tap a portrait to select it, then use
+  **Remove selected** for an intentional deletion, or **New group** to start over. Up to five
+  recent groups are kept locally so a group can be restored later.
 
 Both modes offer more than "pick one" from the pill at the bottom of the screen:
 
@@ -31,8 +32,8 @@ Both modes offer more than "pick one" from the pill at the bottom of the screen:
 | **2 teams / 3 teams** | Splits the players into teams of equal size, by color. (finger mode) |
 
 The **Settings** gear lets you choose how long everyone has to hold still (fast / normal /
-slow), turn haptics or keep-screen-on off, decide whether the app remembers the last mode,
-and control automatic updates.
+slow), turn haptics or keep-screen-on off, choose automatic or manual portrait capture,
+decide whether the app remembers the last mode, and control automatic updates.
 
 Designed to be invisible: a single ~3 MB APK, no background services, no wakelocks, no
 trackers, zero frames drawn while nothing moves, and the camera is released the moment the

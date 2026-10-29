@@ -18,6 +18,10 @@ class Settings(context: Context) {
         get() = prefs.getBoolean(KEY_HAPTICS, true)
         set(value) = prefs.edit().putBoolean(KEY_HAPTICS, value).apply()
 
+    var autoCapturePortraits: Boolean
+        get() = prefs.getBoolean(KEY_AUTO_CAPTURE_PORTRAITS, true)
+        set(value) = prefs.edit().putBoolean(KEY_AUTO_CAPTURE_PORTRAITS, value).apply()
+
     var keepScreenOn: Boolean
         get() = prefs.getBoolean(KEY_KEEP_SCREEN_ON, true)
         set(value) = prefs.edit().putBoolean(KEY_KEEP_SCREEN_ON, value).apply()
@@ -89,6 +93,7 @@ class Settings(context: Context) {
         private const val FILE = "whooz"
         private const val KEY_STABILIZATION = "stabilization"
         private const val KEY_HAPTICS = "haptics"
+        private const val KEY_AUTO_CAPTURE_PORTRAITS = "auto_capture_portraits"
         private const val KEY_KEEP_SCREEN_ON = "keep_screen_on"
         private const val KEY_REMEMBER_MODE = "remember_mode"
         private const val KEY_LAST_MODE = "last_mode"

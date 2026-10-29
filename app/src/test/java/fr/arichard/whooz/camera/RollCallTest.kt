@@ -58,6 +58,31 @@ class RollCallTest {
     }
 
     @Test
+    fun manualCaptureDoesNotLockUntilRequested() {
+        val rc = call()
+        assertEquals(-1L, holdWithoutAutoLock(rc, 1, 1, 0, 3000))
+        assertFalse(rc.awaitingClear)
+        assertTrue(rc.forceLock(1, 1, 1))
+        assertTrue(rc.awaitingClear)
+        assertEquals(0, rc.enrol())
+    }
+
+    private fun holdWithoutAutoLock(
+        rc: RollCall,
+        confirmed: Int,
+        version: Int,
+        from: Long,
+        to: Long,
+    ): Long {
+        var t = from
+        while (t <= to) {
+            if (rc.update(confirmed, version, if (confirmed == 1) version else -1, t, autoLock = false)) return t
+            t += 50
+        }
+        return -1L
+    }
+
+    @Test
     fun newTrackIdOnlyLocksIfTheSetVersionAlsoChanges() {
         val rc = call()
         assertTrue(hold(rc, 1, 1, 0, 1000, mlId = 7) >= 0)

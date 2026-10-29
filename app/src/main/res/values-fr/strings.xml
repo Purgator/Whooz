@@ -33,6 +33,12 @@
     <string name="rollcall_hint_full">Tout le monde est là — touchez Go</string>
     <string name="rollcall_go">Go</string>
     <string name="rollcall_new_group">Nouveau groupe</string>
+    <string name="rollcall_recent_groups">Groupes récents</string>
+    <string name="rollcall_remove_player">Supprimer la sélection</string>
+    <string name="rollcall_capture">Capturer</string>
+    <string name="rollcall_no_recent_groups">Aucun groupe enregistré</string>
+    <string name="rollcall_recent_group_title">Groupes récents</string>
+    <string name="rollcall_recent_group_item">Groupe de %1$d joueurs</string>
 
     <!-- Sub-modes -->
     <string name="mode_winner_1">1 gagnant</string>
@@ -58,6 +64,8 @@
     <string name="settings_delay_slow">Lent</string>
     <string name="settings_haptics">Vibrations</string>
     <string name="settings_haptics_summary">Vibrer à chaque tic et à la révélation</string>
+    <string name="settings_auto_capture">Capturer les portraits automatiquement</string>
+    <string name="settings_auto_capture_summary">Après le délai, ou avec le bouton Capturer</string>
     <string name="settings_keep_screen_on">Garder l\'écran allumé</string>
     <string name="settings_keep_screen_on_summary">Tant qu\'une partie est à l\'écran</string>
     <string name="settings_remember_mode">Retenir le dernier mode</string>

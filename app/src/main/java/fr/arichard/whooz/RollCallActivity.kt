@@ -3,8 +3,11 @@ package fr.arichard.whooz
 import android.graphics.Bitmap
 import android.view.View
 import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
 import fr.arichard.whooz.camera.FaceFrame
+import fr.arichard.whooz.camera.RecentGroupStore
 import fr.arichard.whooz.camera.RollCallView
 import fr.arichard.whooz.core.Mode
 import fr.arichard.whooz.core.Settings
@@ -30,11 +33,18 @@ class RollCallActivity : CameraHostActivity(), RollCallView.Host {
     private lateinit var overlay: RollCallView
     private lateinit var goButton: TextView
     private lateinit var newGroupButton: View
+    private lateinit var recentGroupsButton: TextView
+    private lateinit var removeButton: TextView
+    private lateinit var captureButton: TextView
     private lateinit var modeChips: Array<TextView>
+    private lateinit var recentGroups: RecentGroupStore
+    private var rosterDirty = false
+    private var configuring = false
 
     override fun onCreateContent(): List<View> {
         overlay = findViewById(R.id.rollcall_overlay)
         overlay.host = this
+        recentGroups = RecentGroupStore(this)
 
         val cameraButton = findViewById<View>(R.id.btn_camera)
         cameraButton.setOnClickListener { goTo(CameraActivity::class.java, Settings.ScreenMode.CAMERA) }
@@ -42,7 +52,16 @@ class RollCallActivity : CameraHostActivity(), RollCallView.Host {
         goButton = findViewById(R.id.rollcall_go)
         goButton.setOnClickListener { overlay.startRound() }
         newGroupButton = findViewById(R.id.rollcall_new_group)
-        newGroupButton.setOnClickListener { overlay.newGroup() }
+        newGroupButton.setOnClickListener {
+            saveCurrentGroup()
+            overlay.newGroup()
+        }
+        recentGroupsButton = findViewById(R.id.rollcall_recent)
+        recentGroupsButton.setOnClickListener { showRecentGroups() }
+        removeButton = findViewById(R.id.rollcall_remove)
+        removeButton.setOnClickListener { overlay.removeSelected() }
+        captureButton = findViewById(R.id.rollcall_capture)
+        captureButton.setOnClickListener { overlay.captureNow() }
 
         val pill = findViewById<View>(R.id.camera_pill)
         modeChips = arrayOf(findViewById(R.id.chip_pick_1), findViewById(R.id.chip_pick_2))
@@ -51,15 +70,34 @@ class RollCallActivity : CameraHostActivity(), RollCallView.Host {
             val mode = modes[i]
             modeChips[i].setOnClickListener { selectMode(mode, persist = true) }
         }
-        return listOf(cameraButton, goButton, newGroupButton, pill, modeChips[0], modeChips[1])
+        return listOf(
+            cameraButton,
+            goButton,
+            newGroupButton,
+            recentGroupsButton,
+            removeButton,
+            captureButton,
+            pill,
+            modeChips[0],
+            modeChips[1],
+        )
     }
 
     override fun onResumeContent() {
-        overlay.configure(Timings.camera(settings.stabilization), Haptics(this, settings.haptics), settings.rollCallMode)
+        configuring = true
+        overlay.configure(
+            Timings.camera(settings.stabilization),
+            Haptics(this, settings.haptics),
+            settings.rollCallMode,
+            settings.autoCapturePortraits,
+        )
         selectMode(settings.rollCallMode, persist = false)
+        configuring = false
+        refreshRecentGroupsButton()
     }
 
     override fun onPauseContent() {
+        saveCurrentGroup()
         overlay.resetAll()
     }
 
@@ -110,11 +148,24 @@ class RollCallActivity : CameraHostActivity(), RollCallView.Host {
     }
 
     override fun onRosterChanged(count: Int, canDraw: Boolean) {
+        if (!configuring) rosterDirty = count > 0
         // Enabled state is shown by color, not alpha: the chrome fade owns the alpha.
         goButton.isEnabled = canDraw
         goButton.setBackgroundResource(if (canDraw) R.drawable.bg_go else R.drawable.bg_go_disabled)
         goButton.setTextColor(ContextCompat.getColor(this, if (canDraw) R.color.arena else R.color.text_secondary))
         newGroupButton.visibility = if (count > 0) View.VISIBLE else View.INVISIBLE
+    }
+
+    override fun onPortraitSelected(index: Int) {
+        removeButton.visibility = if (index >= 0) View.VISIBLE else View.GONE
+    }
+
+    override fun onCaptureAvailable(available: Boolean) {
+        captureButton.isEnabled = available
+        captureButton.setBackgroundResource(if (available) R.drawable.bg_go else R.drawable.bg_go_disabled)
+        captureButton.setTextColor(
+            ContextCompat.getColor(this, if (available) R.color.arena else R.color.text_secondary),
+        )
     }
 
     override fun capturePortrait(cx: Float, cy: Float, radius: Float, sizePx: Int): Bitmap? {
@@ -177,6 +228,47 @@ class RollCallActivity : CameraHostActivity(), RollCallView.Host {
 
     override fun onInteraction() {
         armKeepScreenOn()
+    }
+
+    private fun saveCurrentGroup() {
+        if (!rosterDirty) return
+        val portraits = overlay.currentPortraits()
+        if (portraits.isEmpty()) return
+        try {
+            recentGroups.saveGroup(portraits)
+            rosterDirty = false
+            refreshRecentGroupsButton()
+        } catch (error: java.io.IOException) {
+            Toast.makeText(this, error.localizedMessage ?: "Could not save group", Toast.LENGTH_SHORT).show()
+        } catch (error: IllegalStateException) {
+            Toast.makeText(this, error.localizedMessage ?: "Could not save group", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun refreshRecentGroupsButton() {
+        if (::recentGroupsButton.isInitialized) {
+            recentGroupsButton.visibility = if (recentGroups.summaries().isEmpty()) View.GONE else View.VISIBLE
+        }
+    }
+
+    private fun showRecentGroups() {
+        saveCurrentGroup()
+        val summaries = recentGroups.summaries()
+        if (summaries.isEmpty()) {
+            Toast.makeText(this, R.string.rollcall_no_recent_groups, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val labels = summaries.map { getString(R.string.rollcall_recent_group_item, it.count) }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.rollcall_recent_group_title)
+            .setItems(labels) { _, which ->
+                val portraits = recentGroups.load(summaries[which])
+                if (portraits.isNotEmpty()) {
+                    overlay.restoreGroup(portraits)
+                    rosterDirty = false
+                }
+            }
+            .show()
     }
 
     override fun onCameraSleep() {

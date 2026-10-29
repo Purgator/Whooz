@@ -64,6 +64,11 @@ class SettingsActivity : AppCompatActivity() {
 
         bindChips()
         bindSwitch(R.id.row_haptics, R.id.switch_haptics, settings.haptics) { settings.haptics = it }
+        bindSwitch(
+            R.id.row_auto_capture,
+            R.id.switch_auto_capture,
+            settings.autoCapturePortraits,
+        ) { settings.autoCapturePortraits = it }
         bindSwitch(R.id.row_keep_screen_on, R.id.switch_keep_screen_on, settings.keepScreenOn) {
             settings.keepScreenOn = it
         }
