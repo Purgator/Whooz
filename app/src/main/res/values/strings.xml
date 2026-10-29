@@ -36,9 +36,11 @@
     <string name="rollcall_recent_groups">Recent groups</string>
     <string name="rollcall_remove_player">Remove selected</string>
     <string name="rollcall_capture">Capture</string>
-    <string name="rollcall_no_recent_groups">No saved groups yet</string>
+    <string name="rollcall_no_recent_groups">No groups in this session yet</string>
     <string name="rollcall_recent_group_title">Recent groups</string>
     <string name="rollcall_recent_group_item">Group with %1$d players</string>
+    <string name="rollcall_recent_group_hint">Tap a group to restore it</string>
+    <string name="rollcall_recent_group_portrait">Player %1$d portrait</string>
 
     <!-- Sub-modes -->
     <string name="mode_winner_1">Pick 1</string>

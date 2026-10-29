@@ -2,6 +2,8 @@ package fr.arichard.whooz
 
 import android.graphics.Bitmap
 import android.view.View
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -13,6 +15,7 @@ import fr.arichard.whooz.core.Mode
 import fr.arichard.whooz.core.Settings
 import fr.arichard.whooz.core.Timings
 import fr.arichard.whooz.ui.Haptics
+import java.io.File
 
 /**
  * Roll call mode: players come in front of the selfie camera one at a time, each is locked and
@@ -37,15 +40,14 @@ class RollCallActivity : CameraHostActivity(), RollCallView.Host {
     private lateinit var removeButton: TextView
     private lateinit var captureButton: TextView
     private lateinit var modeChips: Array<TextView>
-    private lateinit var recentGroups: RecentGroupStore
+    private val recentGroups = RecentGroupStore<Bitmap>(onDiscard = ::recycleIfNeeded)
     private var rosterDirty = false
     private var configuring = false
 
     override fun onCreateContent(): List<View> {
         overlay = findViewById(R.id.rollcall_overlay)
         overlay.host = this
-        recentGroups = RecentGroupStore(this)
-
+        File(filesDir, LEGACY_GROUP_DIRECTORY).deleteRecursively()
         val cameraButton = findViewById<View>(R.id.btn_camera)
         cameraButton.setOnClickListener { goTo(CameraActivity::class.java, Settings.ScreenMode.CAMERA) }
 
@@ -234,41 +236,80 @@ class RollCallActivity : CameraHostActivity(), RollCallView.Host {
         if (!rosterDirty) return
         val portraits = overlay.currentPortraits()
         if (portraits.isEmpty()) return
-        try {
-            recentGroups.saveGroup(portraits)
-            rosterDirty = false
-            refreshRecentGroupsButton()
-        } catch (error: java.io.IOException) {
-            Toast.makeText(this, error.localizedMessage ?: "Could not save group", Toast.LENGTH_SHORT).show()
-        } catch (error: IllegalStateException) {
-            Toast.makeText(this, error.localizedMessage ?: "Could not save group", Toast.LENGTH_SHORT).show()
+        val snapshot = portraits.mapNotNull { portrait ->
+            if (portrait.isRecycled) null else portrait.copy(Bitmap.Config.ARGB_8888, false)
         }
+        if (snapshot.isEmpty()) return
+        recentGroups.saveGroup(snapshot)
+        rosterDirty = false
+        refreshRecentGroupsButton()
     }
 
     private fun refreshRecentGroupsButton() {
         if (::recentGroupsButton.isInitialized) {
-            recentGroupsButton.visibility = if (recentGroups.summaries().isEmpty()) View.GONE else View.VISIBLE
+            recentGroupsButton.visibility = View.VISIBLE
         }
     }
 
     private fun showRecentGroups() {
         saveCurrentGroup()
-        val summaries = recentGroups.summaries()
-        if (summaries.isEmpty()) {
+        val groups = recentGroups.groups()
+        if (groups.isEmpty()) {
             Toast.makeText(this, R.string.rollcall_no_recent_groups, Toast.LENGTH_SHORT).show()
             return
         }
-        val labels = summaries.map { getString(R.string.rollcall_recent_group_item, it.count) }.toTypedArray()
-        AlertDialog.Builder(this)
-            .setTitle(R.string.rollcall_recent_group_title)
-            .setItems(labels) { _, which ->
-                val portraits = recentGroups.load(summaries[which])
-                if (portraits.isNotEmpty()) {
-                    overlay.restoreGroup(portraits)
-                    rosterDirty = false
+        val dialogView = layoutInflater.inflate(R.layout.dialog_recent_groups, null)
+        val container = dialogView.findViewById<LinearLayout>(R.id.recent_groups_container)
+        lateinit var dialog: AlertDialog
+        groups.forEach { group ->
+            val row = layoutInflater.inflate(R.layout.item_recent_group, container, false)
+            val portraits = row.findViewById<LinearLayout>(R.id.recent_group_portraits)
+            group.items.take(MAX_PREVIEW_PORTRAITS).forEachIndexed { portraitIndex, bitmap ->
+                val image = ImageView(this).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        resources.getDimensionPixelSize(R.dimen.recent_portrait_size),
+                        resources.getDimensionPixelSize(R.dimen.recent_portrait_size),
+                    ).also { params ->
+                        if (portraitIndex > 0) {
+                            params.marginStart = resources.getDimensionPixelSize(R.dimen.recent_portrait_gap)
+                        }
+                    }
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                    setBackgroundResource(R.drawable.bg_pill)
+                    clipToOutline = true
+                    contentDescription = getString(
+                        R.string.rollcall_recent_group_portrait,
+                        portraitIndex + 1,
+                    )
+                    setImageBitmap(bitmap)
                 }
+                portraits.addView(image)
             }
+            row.findViewById<TextView>(R.id.recent_group_label).text =
+                getString(R.string.rollcall_recent_group_item, group.items.size)
+            row.contentDescription = getString(
+                R.string.rollcall_recent_group_item,
+                group.items.size,
+            )
+            row.setOnClickListener {
+                dialog.dismiss()
+                overlay.restoreGroup(group.items.mapNotNull { copyPortrait(it) })
+                rosterDirty = false
+            }
+            container.addView(row)
+        }
+        dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.rollcall_recent_group_title)
+            .setMessage(R.string.rollcall_recent_group_hint)
+            .setView(dialogView)
             .show()
+    }
+
+    private fun copyPortrait(bitmap: Bitmap): Bitmap? =
+        if (bitmap.isRecycled) null else bitmap.copy(Bitmap.Config.ARGB_8888, false)
+
+    private fun recycleIfNeeded(bitmap: Bitmap) {
+        if (!bitmap.isRecycled) bitmap.recycle()
     }
 
     override fun onCameraSleep() {
@@ -282,5 +323,7 @@ class RollCallActivity : CameraHostActivity(), RollCallView.Host {
     companion object {
         /** Portrait half-side as a multiple of the ring radius: head plus a bit of shoulders. */
         private const val PORTRAIT_SPAN = 1.25f
+        private const val MAX_PREVIEW_PORTRAITS = 5
+        private const val LEGACY_GROUP_DIRECTORY = "recent_groups"
     }
 }

@@ -6,4 +6,12 @@
     <dimen name="pill_text">14sp</dimen>
     <dimen name="settings_row_height">56dp</dimen>
     <dimen name="settings_padding">20dp</dimen>
+    <dimen name="recent_dialog_padding">8dp</dimen>
+    <dimen name="recent_group_item_height">64dp</dimen>
+    <dimen name="recent_group_item_gap">8dp</dimen>
+    <dimen name="recent_group_item_padding">8dp</dimen>
+    <dimen name="recent_group_label_gap">12dp</dimen>
+    <dimen name="recent_group_label_text">14sp</dimen>
+    <dimen name="recent_portrait_size">48dp</dimen>
+    <dimen name="recent_portrait_gap">4dp</dimen>
 </resources>

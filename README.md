@@ -21,7 +21,8 @@ own updates; camera data stays on the phone. Inspired by [Chwazi](https://chwazi
   the draw runs over the portraits: they pulse, the losers vanish one by one, and the
   winner's portrait fills the screen in their color. Tap a portrait to select it, then use
   **Remove selected** for an intentional deletion, or **New group** to start over. Up to five
-  recent groups are kept locally so a group can be restored later.
+  recent groups stay in memory for the current session, with real portrait thumbnails so a group
+  can be recognized and restored later. Closing the app clears them.
 
 Both modes offer more than "pick one" from the pill at the bottom of the screen:
 

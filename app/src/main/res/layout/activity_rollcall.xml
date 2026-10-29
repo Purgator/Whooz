@@ -140,7 +140,7 @@
                     android:text="@string/rollcall_recent_groups"
                     android:textColor="@color/text_secondary"
                     android:textSize="12sp"
-                    android:visibility="gone" />
+                    android:visibility="visible" />
             </LinearLayout>
 
             <!-- The old single action is intentionally kept as the draw's strong centre button. -->
