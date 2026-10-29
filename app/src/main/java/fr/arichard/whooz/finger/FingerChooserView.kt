@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.RadialGradient
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Shader
@@ -149,6 +150,11 @@ class FingerChooserView @JvmOverloads constructor(
 
     // ---- Paints, rects and strings (never created in a hot path) -------------------------
 
+    private val backgroundPaint = Paint().apply { style = Paint.Style.FILL }
+    private val gridPaint = Paint().apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+    }
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val discPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
@@ -156,16 +162,6 @@ class FingerChooserView @JvmOverloads constructor(
         style = Paint.Style.STROKE
         strokeWidth = dp(3f)
         strokeCap = Paint.Cap.ROUND
-    }
-    private val gridMinorPaint = Paint().apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 1f
-        color = GRID_MINOR_COLOR
-    }
-    private val gridMajorPaint = Paint().apply {
-        style = Paint.Style.STROKE
-        strokeWidth = 1f
-        color = GRID_MAJOR_COLOR
     }
     private val gradientPaint = Paint()
     private val floodPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -200,10 +196,8 @@ class FingerChooserView @JvmOverloads constructor(
     /** "1".."16" precomputed: Order mode draws numbers without building strings. */
     private val numbers: Array<String> = Array(Palette.SIZE + 1) { it.toString() }
 
-    private var gridMinor = FloatArray(0)
-    private var gridMinorCount = 0
-    private var gridMajor = FloatArray(0)
-    private var gridMajorCount = 0
+    private var gridPoints = FloatArray(0)
+    private var gridPointsCount = 0
 
     init {
         for (s in 0 until Palette.SIZE) slotIndex[s] = -1
@@ -479,6 +473,10 @@ class FingerChooserView @JvmOverloads constructor(
         super.onSizeChanged(w, h, oldw, oldh)
         val fw = w.toFloat()
         val fh = h.toFloat()
+        backgroundPaint.shader = RadialGradient(
+            fw / 2f, fh / 2f, Easing.farthestCorner(fw / 2f, fh / 2f, fw, fh),
+            CENTER_COLOR, Palette.BACKGROUND, Shader.TileMode.CLAMP,
+        )
         bottomRect.set(0f, fh - bottomZone, fw, fh)
         gradientPaint.shader = LinearGradient(
             0f, fh - bottomZone, 0f, fh, GRADIENT_TOP, GRADIENT_BOTTOM, Shader.TileMode.CLAMP,
@@ -487,38 +485,25 @@ class FingerChooserView @JvmOverloads constructor(
     }
 
     /**
-     * Grid lines every 48 dp, centred so the pattern is symmetric; every fourth line is a
-     * touch brighter. Stored as drawLines arrays: one call per paint per frame.
+     * Grid dots every 48 dp, centred so the pattern is symmetric. Stored as drawPoints array.
      */
     private fun buildGrid(w: Float, h: Float) {
         val cols = (w / gridStep).toInt()
         val rows = (h / gridStep).toInt()
-        val total = cols + rows
-        gridMinor = FloatArray(total * 4)
-        gridMajor = FloatArray(total * 4)
-        var minor = 0
-        var major = 0
+        val total = (cols + 1) * (rows + 1)
+        gridPoints = FloatArray(total * 2)
+        var count = 0
         val x0 = (w - cols * gridStep) / 2f
         val y0 = (h - rows * gridStep) / 2f
         for (c in 0..cols) {
             val x = x0 + c * gridStep
-            if (c % 4 == 0) major = putLine(gridMajor, major, x, 0f, x, h) else minor = putLine(gridMinor, minor, x, 0f, x, h)
+            for (r in 0..rows) {
+                val y = y0 + r * gridStep
+                gridPoints[count++] = x
+                gridPoints[count++] = y
+            }
         }
-        for (r in 0..rows) {
-            val y = y0 + r * gridStep
-            if (r % 4 == 0) major = putLine(gridMajor, major, 0f, y, w, y) else minor = putLine(gridMinor, minor, 0f, y, w, y)
-        }
-        gridMinorCount = minor
-        gridMajorCount = major
-    }
-
-    private fun putLine(a: FloatArray, at: Int, x0: Float, y0: Float, x1: Float, y1: Float): Int {
-        if (at + 4 > a.size) return at
-        a[at] = x0
-        a[at + 1] = y0
-        a[at + 2] = x1
-        a[at + 3] = y1
-        return at + 4
+        gridPointsCount = count
     }
 
     /**
@@ -543,7 +528,7 @@ class FingerChooserView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         val now = nowMs
         val phase = engine.phase
-        canvas.drawColor(Palette.BACKGROUND)
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
         drawGrid(canvas, now, phase)
         canvas.drawRect(bottomRect, gradientPaint)
         refreshSlots()
@@ -614,10 +599,9 @@ class FingerChooserView @JvmOverloads constructor(
             else -> 0f
         }
         if (alpha <= 0f) return
-        gridMinorPaint.alpha = (GRID_MINOR_ALPHA * alpha).toInt()
-        gridMajorPaint.alpha = (GRID_MAJOR_ALPHA * alpha).toInt()
-        if (gridMinorCount > 0) canvas.drawLines(gridMinor, 0, gridMinorCount, gridMinorPaint)
-        if (gridMajorCount > 0) canvas.drawLines(gridMajor, 0, gridMajorCount, gridMajorPaint)
+        gridPaint.strokeWidth = dp(2f)
+        gridPaint.color = Palette.withAlpha(GRID_MAJOR_COLOR, (0.6f * alpha))
+        if (gridPointsCount > 0) canvas.drawPoints(gridPoints, 0, gridPointsCount, gridPaint)
     }
 
     /**
@@ -797,7 +781,8 @@ class FingerChooserView @JvmOverloads constructor(
         const val HINT_TOO_MANY = HintResolver.TOO_MANY
 
         /** Circle appear pop 0 → 1.08 → 1. */
-        const val APPEAR_MS = 220L
+        private const val CENTER_COLOR = 0xFF141924.toInt()
+        private const val APPEAR_MS = 220L
         /** Ring thickening 5 → 8 dp at the start of the countdown. */
         private const val THICKEN_MS = 200L
         /** Grid dissolve at the start of the countdown. */
@@ -812,9 +797,9 @@ class FingerChooserView @JvmOverloads constructor(
         private const val ABORT_SCALE = 1.08f
         private const val DISC_ALPHA = 0.18f
         private const val TEAM_DISC_ALPHA = 0.5f
-        private const val GLOW_INNER_ALPHA = 0.12f
-        private const val GLOW_MID_ALPHA = 0.08f
-        private const val GLOW_OUTER_ALPHA = 0.04f
+        private const val GLOW_INNER_ALPHA = 0.08f
+        private const val GLOW_MID_ALPHA = 0.05f
+        private const val GLOW_OUTER_ALPHA = 0.02f
         private const val GRID_MINOR_ALPHA = 0x12
         private const val GRID_MAJOR_ALPHA = 0x20
         private const val GRID_MINOR_COLOR = 0x12FFFFFF

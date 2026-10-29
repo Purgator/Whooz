@@ -62,6 +62,18 @@
         <item name="android:background">@color/surface_stroke</item>
     </style>
 
+    <!-- Group of rows within a section. -->
+    <style name="Whooz.Settings.Card" parent="">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginStart">12dp</item>
+        <item name="android:layout_marginEnd">12dp</item>
+        <item name="android:layout_marginTop">4dp</item>
+        <item name="android:layout_marginBottom">4dp</item>
+        <item name="android:background">@drawable/bg_card</item>
+        <item name="android:orientation">vertical</item>
+    </style>
+
     <!-- One of the three stabilization presets. -->
     <style name="Whooz.Settings.Chip" parent="">
         <item name="android:layout_width">0dp</item>

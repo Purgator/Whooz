@@ -743,19 +743,19 @@ class RollCallView @JvmOverloads constructor(
         private const val BIG_FRACTION = 0.62f
         private const val WINNER_Y_FRACTION = 0.42f
 
-        private const val RING_STROKE_DP = 6f
-        private const val GLOW_STROKE_DP = 18f
-        private const val THIN_STROKE_DP = 2f
-        private const val ARC_STROKE_DP = 3f
-        private const val ARC_OFFSET_DP = 7f
-        private const val BORDER_STROKE_DP = 3f
-        private const val CORNER_DP = 12f
+        private const val RING_STROKE_DP = 4f
+        private const val GLOW_STROKE_DP = 32f
+        private const val THIN_STROKE_DP = 1.5f
+        private const val ARC_STROKE_DP = 2.5f
+        private const val ARC_OFFSET_DP = 8f
+        private const val BORDER_STROKE_DP = 2.5f
+        private const val CORNER_DP = 16f
         private const val BADGE_DIAMETER_DP = 20f
         private const val BAND_HEIGHT_DP = 72f
         private const val MIN_RADIUS_DP = 28f
         private const val MAX_RADIUS_FRACTION = 0.45f
 
-        private const val GLOW_ALPHA = 0.25f
+        private const val GLOW_ALPHA = 0.15f
         private const val THIN_ALPHA = 0.5f
         private const val TILE_ALPHA = 0.35f
         private const val TINT_ALPHA = 0.35f

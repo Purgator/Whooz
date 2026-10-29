@@ -753,15 +753,15 @@ class FaceOverlayView @JvmOverloads constructor(
         const val HINT_SLEEPING = 5
 
         // Geometry (dp).
-        private const val RING_STROKE_DP = 6f
-        private const val RING_STROKE_COUNTDOWN_DP = 8f
-        private const val RING_STROKE_WINNER_DP = 10f
-        private const val GLOW_STROKE_DP = 18f
-        private const val THIN_STROKE_DP = 2f
-        private const val ARC_STROKE_DP = 3f
-        private const val ARC_OFFSET_DP = 10f
-        private const val INNER_INSET_DP = 10f
-        private const val INNER_STROKE_DP = 3f
+        private const val RING_STROKE_DP = 4f
+        private const val RING_STROKE_COUNTDOWN_DP = 6f
+        private const val RING_STROKE_WINNER_DP = 8f
+        private const val GLOW_STROKE_DP = 32f
+        private const val THIN_STROKE_DP = 1.5f
+        private const val ARC_STROKE_DP = 2.5f
+        private const val ARC_OFFSET_DP = 8f
+        private const val INNER_INSET_DP = 8f
+        private const val INNER_STROKE_DP = 2.5f
         private const val BADGE_DIAMETER_DP = 18f
         private const val BADGE_GAP_DP = 8f
         private const val BAND_HEIGHT_DP = 72f
@@ -780,7 +780,7 @@ class FaceOverlayView @JvmOverloads constructor(
         const val IDLE_SLEEP_MS = 3L * 60L * 1000L
 
         // Alphas and scales.
-        private const val GLOW_ALPHA = 0.25f
+        private const val GLOW_ALPHA = 0.15f
         private const val IDLE_RING_ALPHA = 0.9f
         private const val TENTATIVE_ALPHA = 0.45f
         private const val LATE_ALPHA = 0.35f
