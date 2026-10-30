@@ -202,7 +202,7 @@ build) that draws the raw face boxes over the preview.
 
 ## License
 
-Whooz is free software licensed under the **GNU General Public License v3.0** — see
+Whooz is free software licensed under the **GNU General Public License v3.0 or later (`GPL-3.0-or-later`)** — see
 [LICENSE](LICENSE). You may use, study, share, and modify it; if you distribute a modified
 version, you must release your changes under the same license.
 
